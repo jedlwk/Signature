@@ -1,0 +1,1 @@
+Great question! Three things to know: the platform serves as a pivotal hub, it is robust, and it is seamless. We tested it and we saw that it works; experts say it could potentially scale. We are checking with the team and will come back to you once we have more.

@@ -1,0 +1,93 @@
+{
+  "skill": "jed-writing-style",
+  "about": "Scenarios for judging whether the skill changes Claude's output. Run each query twice, once with the skill and once without, then score both against expected_behavior. See evals/README.md.",
+  "evals": [
+    {
+      "id": "linkedin-post",
+      "query": "Draft a LinkedIn post about the workshop I ran last week for 30 HR leaders. They built a small CV screening tool with no code. The big question in the room was who checks the AI's work.",
+      "files": [],
+      "expected_behavior": [
+        "Opens on a real question or a concrete moment, not on 'I am thrilled' or 'excited to share'",
+        "Uses only the facts given (30 HR leaders, no code, CV screening tool, who checks the work). Invents no extra numbers, names or quotes",
+        "Contains no em dash, en dash, spaced hyphen or semicolon",
+        "At most one burst of exclamation marks",
+        "Ends on a plain line about Jed's own view or role, not a slogan",
+        "Runs ai_check.py with --register post and reports the result in one line"
+      ]
+    },
+    {
+      "id": "customer-answer",
+      "query": "A customer asks: 'If we send 50 frames in one request, do the results come back in the same order?' Write the answer for our Q&A doc. We know they do. We have not tested more than 20 frames.",
+      "files": [],
+      "expected_behavior": [
+        "First sentence answers the question directly (yes, order is preserved)",
+        "Uses a bold lead-in instead of a preamble sentence",
+        "States behaviour as fact and never says 'we tested' or 'we saw'",
+        "Does not leave an open loop such as 'we will confirm' or 'we are checking'",
+        "Does not claim 50 frames was tested, and does not print a number it cannot back up",
+        "Contains no exclamation mark and no dash used as punctuation",
+        "Runs ai_check.py with --register customer"
+      ]
+    },
+    {
+      "id": "three-slide-deck",
+      "query": "Outline three slides for a 5 minute talk to business leaders: the problem (manual review of 10,000 documents a month), what we built, and a live demo.",
+      "files": [],
+      "expected_behavior": [
+        "One message per slide",
+        "Headlines are short and have no full stop at the end",
+        "No box or bullet runs past two lines",
+        "Slide order follows problem, then solution, then demo, and the demo slide is minimal",
+        "Uses the 10,000 figure only as given and adds no invented statistics",
+        "Contains no filler headers such as 'The Goal' and no brochure closer"
+      ]
+    },
+    {
+      "id": "speaker-script",
+      "query": "Write the speaker script for the problem slide of that talk. About 90 seconds.",
+      "files": [],
+      "expected_behavior": [
+        "States an estimated length and lands near 210 words (90 seconds at about 140 words a minute)",
+        "Average sentence is about 10 words and none is longer than 25",
+        "Uses contractions the way a person speaks",
+        "Contains no brackets, slashes, 'e.g.', 'etc.' or ampersands inside the spoken lines",
+        "Numbers are written the way they are said",
+        "Opens on a real question or moment and ends on the next step or a question"
+      ]
+    },
+    {
+      "id": "polish-my-draft",
+      "query": "Polish this but keep my tone: 'hey team, quick update, the demo went well!! the customer liked the dashboard alot and asked for a follow up next week. thanks for all the hard work on this, really appreciate it'",
+      "files": [],
+      "expected_behavior": [
+        "Keeps Jed's wording and warmth. Changes only spelling, spacing and clear mistakes",
+        "Keeps the exclamation marks, since this is a message to teammates",
+        "Does not turn it into a formal or corporate message",
+        "Does not add new facts, praise or sign-off lines",
+        "Fixes 'alot' and 'follow up' (noun is 'follow-up' or 'follow up' either way) without over-editing"
+      ]
+    },
+    {
+      "id": "code-comment",
+      "query": "In my CS7646 repo, add a comment above this line: df['ret'] = np.log(df['close']).diff()",
+      "files": [],
+      "expected_behavior": [
+        "Writes one short comment, lowercase, abbreviations fine",
+        "Explains why (log returns, so they add across days), not what",
+        "Does not add a docstring, a banner or a multi-line essay",
+        "Contains no dash used as punctuation"
+      ]
+    },
+    {
+      "id": "audit-only",
+      "query": "AI check this and tell me what to fix, don't rewrite it: 'In today's fast-paced landscape, our robust platform seamlessly empowers teams to unlock value. Moreover, it serves as a pivotal hub.'",
+      "files": [],
+      "expected_behavior": [
+        "Runs ai_check.py or applies the same checks",
+        "Reports findings grouped by priority and names the specific words and patterns",
+        "Does not rewrite the passage unless asked",
+        "The report is short and readable, not a dump of every match"
+      ]
+    }
+  ]
+}

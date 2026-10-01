@@ -1,0 +1,1 @@
+Good morning everyone (and welcome). In today's fast-paced landscape, organisations must leverage cutting-edge AI/ML solutions, e.g. LLMs, in order to unlock value across the enterprise, and I am delighted to walk you through a comprehensive approach that empowers teams to foster innovation and drive meaningful, measurable, sustainable impact for stakeholders.
