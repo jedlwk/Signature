@@ -21,6 +21,8 @@ Results are in `evals/RESULTS.md`.
   for a phrase repeated three times and for paragraphs that are all the same length.
 - GitHub Actions: tests on every push, and a release workflow that attaches a zip of the skill.
 - MIT license.
+- README rewritten for a first-time reader: it says who it is for, defines its terms before using them, and
+  stays under 200 lines. Every checker option moved to `docs/checker.md`.
 
 ## 2.0.0
 
