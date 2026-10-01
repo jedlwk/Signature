@@ -8,6 +8,10 @@ Usage:
     python3 ai_check.py app.py                 (source files: comments and docstrings only)
     pbpaste | python3 ai_check.py - --register post
     python3 ai_check.py draft.md --json        (machine-readable output)
+    python3 ai_check.py draft.md --facts-text "30 HR leaders, no code"   (flag numbers not in the facts)
+    python3 ai_check.py script.md --register script --target-seconds 90  (check the spoken length)
+    python3 ai_check.py draft.md --fix         (print the text with safe mechanical fixes applied)
+    python3 ai_check.py --baseline my-writing/ (measure my own writing and suggest thresholds)
     python3 ai_check.py --list-registers
 
 Skip a passage with <!-- signature:ignore-start --> ... <!-- signature:ignore-end -->, or skip one
@@ -20,6 +24,7 @@ past drafts and gives a rough score. A clean result means "nothing obvious", not
 """
 import argparse
 import json
+import os
 import re
 import statistics
 import sys
@@ -27,7 +32,7 @@ import zipfile
 from collections import namedtuple
 from pathlib import Path
 
-__version__ = "2.0.0"
+__version__ = "2.1.0"
 
 # ---------------------------------------------------------------------------
 # Thresholds. Each value has a reason so nobody has to guess what it means.
@@ -50,7 +55,7 @@ DEFAULT_LONG_CAP = 30
 MIN_STDEV = 4.0
 # Fewer than six sentences is too small a sample to judge rhythm.
 MIN_SENTENCES_FOR_RHYTHM = 6
-# Jed asked twice for fewer commas. His approved doc sits at 0.73 per sentence.
+# Jed asked twice for fewer commas. The approved customer doc sits at 0.73 per sentence.
 MAX_COMMAS_PER_SENTENCE = 1.0
 # A sentence with three or more commas is the one to split.
 HEAVY_COMMAS = 3
@@ -61,6 +66,21 @@ LIST_ITEM_WORDS = 3
 SLIDE_LINE_CAP = 25
 # Short sentences (under this many words) should be about a third of a document.
 SHORT_WORDS = 8
+
+# People speak at about 130 to 150 words a minute. 140 is the middle.
+SPOKEN_WPM = 140
+# A script within this share of its target length is close enough.
+TARGET_TOLERANCE = 0.15
+# The same four words used this many times in one piece is a habit, not a choice.
+REPEAT_PHRASE_WORDS = 4
+REPEAT_PHRASE_COUNT = 3
+# Paragraphs this close in length (share of the mean), four or more in a row, look machine-made.
+UNIFORM_SPREAD = 0.15
+MIN_PARAGRAPHS_FOR_UNIFORM = 4
+# Where --baseline saves, and where the checker looks for it automatically.
+CALIBRATION_PATH = Path.home() / ".claude" / "signature" / "calibration.json"
+# Bounds for calibrated values, so a tiny or odd sample can't set a silly threshold.
+CALIBRATION_BOUNDS = {"mean_cap": (12, 20), "long_cap": (25, 40), "short_floor": (0.05, 0.25), "max_commas": (0.6, 1.2)}
 
 IGNORE_RE = re.compile(r"<!--\s*signature:ignore-start\s*-->.*?<!--\s*signature:ignore-end\s*-->", re.S)
 IGNORE_LINE_RE = re.compile(r"^.*signature:ignore-line.*$", re.M)
@@ -146,8 +166,12 @@ PATTERNS = [
       r"only time will tell|remains to be seen)\b",
       "Formula ending. Delete it.", 3),
     P("P1", "discovery voice",
-      r"\bwe\s+(tried|ran|saw|tested|deployed|found that|checked|noticed)\b",
+      r"\bwe(?:'ve|\s+have)?\s+(tried|ran|run|seen|saw|tested|deployed|found that|checked|noticed)\b",
       "Jed is supposed to know the product. State the behaviour as fact.", 2, only=("customer", "doc")),
+    P("P1", "invented anecdote",
+      r"\b(one (team|customer|client|company|person|manager) (i|we) (worked|spoke|talked|met)\w*|i once\b|"
+      r"a friend of mine|someone (once )?told me|i (?:was )?talk(?:ed|ing) to a)",
+      "An anecdote Jed did not give. Use a placeholder like [a short story from the project] or cut it.", 3),
     P("P1", "copula avoidance",
       r"\b(serves as|serve as|stands as|stand as|acts as a|functions as a|represents a (significant|major|key))\b",
       "Just say 'is'.", 2),
@@ -213,6 +237,10 @@ BUILTIN = {
     "group of three?": ("P2", 0, "Check it isn't a tidy parallel triple. Uneven, natural lists are fine."),
     "same opener x3": ("P2", 0.5, "Fine if it is deliberate repetition. Otherwise vary the openings."),
     "curly quotes": ("P2", 0.5, "Use straight quotes in plain text."),
+    "number not in facts": ("P1", 3, "Not in the facts you gave. Use a placeholder like [number] or ask."),
+    "repeated phrase": ("P2", 0.5, "The same phrase three times. Vary it or cut it."),
+    "uniform paragraphs": ("P2", 0.5, "Every paragraph is about the same length. Vary them."),
+    "spoken length": ("P1", 2, "Adjust the script to the target length."),
 }
 
 
@@ -310,17 +338,132 @@ def snippet(text, start, end, pad=25):
 
 
 # ---------------------------------------------------------------------------
+# Numbers, so a draft can be checked against the facts it was given
+# ---------------------------------------------------------------------------
+
+UNITS = {w: i for i, w in enumerate(
+    "zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen "
+    "sixteen seventeen eighteen nineteen".split())}
+TENS = {w: 10 * (i + 2) for i, w in enumerate("twenty thirty forty fifty sixty seventy eighty ninety".split())}
+SCALES = {"thousand": 1000, "million": 10 ** 6, "billion": 10 ** 9}
+NUMERAL = re.compile(r"\d[\d,]*(?:\.\d+)?")
+# Whole numbers up to this size are too common to treat as claims ("2 routes", "step 3").
+SMALL_NUMBER = 10
+
+
+def _clean_numeral(raw):
+    return raw.replace(",", "").rstrip(".")
+
+
+def number_values(text):
+    """Return {normalised value: first matching snippet} for numbers that could be claims.
+
+    Numerals count when they are decimals or bigger than 10. Spelled-out numbers ("twelve thousand")
+    are converted so "ten thousand" matches "10,000".
+    """
+    found = {}
+    for m in NUMERAL.finditer(text):
+        value = _clean_numeral(m.group(0))
+        try:
+            number = float(value)
+        except ValueError:
+            continue
+        if "." in value or number > SMALL_NUMBER:
+            found.setdefault(str(int(number)) if number == int(number) else value, m.group(0))
+    tokens = [(m.group(0).lower(), m.start()) for m in re.finditer(r"[A-Za-z]+", text)]
+    i = 0
+    while i < len(tokens):
+        word = tokens[i][0]
+        if word in UNITS or word in TENS or word in SCALES or word == "hundred":
+            j, total, current = i, 0, 0
+            while j < len(tokens) and (tokens[j][0] in UNITS or tokens[j][0] in TENS or tokens[j][0] in SCALES
+                                       or tokens[j][0] == "hundred"):
+                w = tokens[j][0]
+                if w in UNITS:
+                    current += UNITS[w]
+                elif w in TENS:
+                    current += TENS[w]
+                elif w == "hundred":
+                    current = (current or 1) * 100
+                else:
+                    total += (current or 1) * SCALES[w]
+                    current = 0
+                j += 1
+            value = total + current
+            if value > SMALL_NUMBER:
+                found.setdefault(str(value), " ".join(t[0] for t in tokens[i:j]))
+            i = j
+        else:
+            i += 1
+    return found
+
+
+STOPWORDS = set("a an and are as at be but by for from has have he her his i in is it its of on or our "
+                "she so that the their them then there they this to was we were what when which who will "
+                "with you your not no do does did if than too very can could would should about into".split())
+
+
+def repeated_phrases(text):
+    """Four-word phrases (with at least two content words) used three or more times."""
+    tokens = [w.lower() for w in WORD.findall(text)]
+    counts = {}
+    for i in range(len(tokens) - REPEAT_PHRASE_WORDS + 1):
+        gram = tokens[i:i + REPEAT_PHRASE_WORDS]
+        if sum(1 for w in gram if w not in STOPWORDS) >= 2:
+            counts[" ".join(gram)] = counts.get(" ".join(gram), 0) + 1
+    return {g: n for g, n in counts.items() if n >= REPEAT_PHRASE_COUNT}
+
+
+def uniform_paragraphs(text):
+    """True when four or more full paragraphs are all within a few percent of the same length."""
+    sizes = [len(WORD.findall(p)) for p in re.split(r"\n\s*\n", text)]
+    sizes = [n for n in sizes if n >= 15]
+    if len(sizes) < MIN_PARAGRAPHS_FOR_UNIFORM:
+        return False
+    mean = statistics.mean(sizes)
+    return all(abs(n - mean) <= UNIFORM_SPREAD * mean for n in sizes)
+
+
+SCRIPT_LABEL = re.compile(r"\s*(estimated length|(slide|scene|section)\s*\d+)\b", re.I)
+
+
+def spoken_text(text):
+    """What would actually be said: no [slide labels], no 'Slide 2' lines, no 'Estimated length' line.
+
+    Blanked lines stay as empty lines so line numbers still match the file.
+    """
+    text = re.sub(r"\[[^\]\n]*\]", " ", text)
+    return "\n".join("" if SCRIPT_LABEL.match(l) else l for l in text.splitlines())
+
+
+def effective_limits(reg, register, calibration):
+    """Thresholds for this register. Calibration only changes the everyday prose registers."""
+    limits = {"mean_cap": reg.mean_cap, "long_cap": reg.long_cap, "short_floor": reg.short_floor,
+              "max_commas": MAX_COMMAS_PER_SENTENCE}
+    if calibration and register not in ("script", "slides", "code"):
+        for key, (low, high) in CALIBRATION_BOUNDS.items():
+            if key in calibration:
+                if key == "short_floor" and not reg.short_floor:
+                    continue
+                limits[key] = min(max(float(calibration[key]), low), high)
+    return limits
+
+
+# ---------------------------------------------------------------------------
 # Analysis (pure function, so tests can call it directly)
 # ---------------------------------------------------------------------------
 
-def analyse(raw, register="general", suffix=""):
+def analyse(raw, register="general", suffix="", facts=None, target_seconds=None, calibration=None):
     reg = REGISTERS[register]
+    limits = effective_limits(reg, register, calibration)
     is_code = suffix in CODE_EXT
     if is_code:
         raw = extract_comments(raw, suffix)
         text = IGNORE_LINE_RE.sub("", IGNORE_RE.sub(blank, raw))
     else:
         text = strip_markup(raw)
+        if register == "script":
+            text = spoken_text(text)
 
     words = WORD.findall(text)
     n_words = max(len(words), 1)
@@ -377,6 +520,33 @@ def analyse(raw, register="general", suffix=""):
             if n > SLIDE_LINE_CAP:
                 add("wordy slide text", i, line.strip()[:70], advice="%d words in one line. Two lines per box at most." % n)
 
+    if facts:
+        known = number_values(facts)
+        for value, shown in number_values(text).items():
+            if value not in known:
+                idx = text.find(shown)
+                add("number not in facts", line_of(text, max(idx, 0)), shown,
+                    advice="'%s' is not in the facts you gave. Use a placeholder like [number] or ask." % shown)
+
+    spoken_words = spoken_seconds = None
+    if register == "script":
+        spoken_words = len(text.split())
+        spoken_seconds = spoken_words / SPOKEN_WPM * 60
+        if target_seconds:
+            low, high = target_seconds * (1 - TARGET_TOLERANCE), target_seconds * (1 + TARGET_TOLERANCE)
+            if not low <= spoken_seconds <= high:
+                need = int(round(target_seconds / 60 * SPOKEN_WPM))
+                add("spoken length", 0, "%d words" % spoken_words,
+                    advice="About %.0f seconds at %d words a minute. A %d second script needs about %d words."
+                           % (spoken_seconds, SPOKEN_WPM, target_seconds, need))
+
+    if register not in ("code", "slides", "script"):
+        for phrase, n in sorted(repeated_phrases(text).items()):
+            add("repeated phrase", line_of(text, max(text.lower().find(phrase.split()[0]), 0)),
+                '"%s" x%d' % (phrase, n))
+        if uniform_paragraphs(text):
+            add("uniform paragraphs", 0, "paragraphs within %d%% of each other" % (UNIFORM_SPREAD * 100))
+
     if not is_code:
         for m in TRIPLE.finditer(text):
             add("group of three?", line_of(text, m.start()), " ".join(m.group(0).split()))
@@ -392,21 +562,21 @@ def analyse(raw, register="general", suffix=""):
     median = statistics.median(lens)
     stdev = statistics.pstdev(lens) if len(lens) > 1 else 0.0
     short = sum(1 for n in lens if n < SHORT_WORDS) / len(lens)
-    n_long = sum(1 for n in lens if reg.long_cap and n > reg.long_cap)
+    n_long = sum(1 for n in lens if limits["long_cap"] and n > limits["long_cap"])
     commas = text.count(",") / max(len(sents), 1)
     enough = len(lens) >= MIN_SENTENCES_FOR_RHYTHM
 
     rhythm = []
     if reg.rhythm:
-        if mean > reg.mean_cap:
+        if mean > limits["mean_cap"]:
             rhythm.append("Mean sentence length %.0f words. Aim for %s." % (mean, "about 10" if register == "script" else "12 to 15"))
         if reg.variation and enough and stdev < MIN_STDEV:
             rhythm.append("Sentence lengths barely vary (stdev %.1f). Mix short lines with longer ones." % stdev)
-        if reg.short_floor and enough and short < reg.short_floor:
+        if limits["short_floor"] and enough and short < limits["short_floor"]:
             rhythm.append("Only %.0f%% of sentences are under %d words. Mix in some short ones." % (short * 100, SHORT_WORDS))
         if n_long > max(1, len(lens) // 12):
-            rhythm.append("%d sentences over %d words. Split them." % (n_long, reg.long_cap))
-    if reg.commas and commas > MAX_COMMAS_PER_SENTENCE:
+            rhythm.append("%d sentences over %d words. Split them." % (n_long, limits["long_cap"]))
+    if reg.commas and commas > limits["max_commas"]:
         rhythm.append("%.2f commas per sentence. Aim for under 1." % commas)
 
     n_not_x = sum(1 for f in findings if f["label"] == "not X but Y")
@@ -426,7 +596,109 @@ def analyse(raw, register="general", suffix=""):
         "other_tells": sum(v for k, v in counts.items() if k not in ("dash", "banned word", "group of three?")),
         "findings": sorted(findings, key=lambda f: (TIER_ORDER[f["tier"]], f["label"], f["line"])),
         "rhythm": rhythm, "not_x_allowed": n_not_x == 1,
+        "spoken_words": spoken_words, "spoken_seconds": None if spoken_seconds is None else round(spoken_seconds),
+        "calibrated": bool(calibration),
     }
+
+
+# ---------------------------------------------------------------------------
+# Safe fixes. Only changes that can't alter the meaning. Dashes and word choices stay manual.
+# ---------------------------------------------------------------------------
+
+PROTECT = re.compile(
+    r"```.*?```|`[^`\n]*`|<!--\s*signature:ignore-start.*?signature:ignore-end\s*-->|https?://\S+|"
+    r"^.*signature:ignore-line.*$", re.S | re.M)
+
+# (label, regex, replacement). Replacements keep the capital if the match started with one.
+FIXES = [
+    ("in order to", re.compile(r"\bin order to\b", re.I), "to"),
+    ("due to the fact that", re.compile(r"\bdue to the fact that\b", re.I), "because"),
+    ("at this point in time", re.compile(r"\bat this point in time\b", re.I), "now"),
+    ("in the event that", re.compile(r"\bin the event that\b", re.I), "if"),
+    ("for the purpose of", re.compile(r"\bfor the purpose of\b", re.I), "for"),
+    ("a wide range of", re.compile(r"\ba wide (?:range|array|variety) of\b", re.I), "many"),
+    ("utilize", re.compile(r"\butili[sz]e\b", re.I), "use"),
+    ("utilizes", re.compile(r"\butili[sz]es\b", re.I), "uses"),
+    ("utilized", re.compile(r"\butili[sz]ed\b", re.I), "used"),
+    ("utilizing", re.compile(r"\butili[sz]ing\b", re.I), "using"),
+]
+CURLY_MAP = {"\u201c": '"', "\u201d": '"', "\u2018": "'", "\u2019": "'"}
+
+
+def _keep_case(old, new):
+    return new[:1].upper() + new[1:] if old[:1].isupper() else new
+
+
+def fix_text(raw):
+    """Return (fixed_text, {label: count}). Code, links and ignored passages are left alone."""
+    counts = {}
+
+    def fix_gap(gap):
+        for label, regex, new in FIXES:
+            gap, n = regex.subn(lambda m: _keep_case(m.group(0), new), gap)
+            if n:
+                counts[label] = counts.get(label, 0) + n
+        gap, n = CURLY.subn(lambda m: CURLY_MAP[m.group(0)], gap)
+        if n:
+            counts["curly quotes"] = counts.get("curly quotes", 0) + n
+        return gap
+
+    out, last = [], 0
+    for m in PROTECT.finditer(raw):
+        out.append(fix_gap(raw[last:m.start()]))
+        out.append(m.group(0))
+        last = m.end()
+    out.append(fix_gap(raw[last:]))
+    return "".join(out), counts
+
+
+# ---------------------------------------------------------------------------
+# Calibration from Jed's own writing
+# ---------------------------------------------------------------------------
+
+def measure_folder(folder):
+    """Measure a folder of writing and suggest thresholds. Returns (rows, suggestion)."""
+    rows = []
+    for path in sorted(Path(folder).expanduser().rglob("*")):
+        if path.suffix.lower() not in (".md", ".txt", ".docx", ".pptx") or not path.is_file():
+            continue
+        try:
+            r = analyse(read_text(str(path)), "general", path.suffix.lower())
+        except (OSError, zipfile.BadZipFile):
+            continue
+        if r["sentences"] >= MIN_SENTENCES_FOR_RHYTHM:
+            rows.append((path.name, r))
+    if not rows:
+        return rows, {}
+
+    def clamp(key, value):
+        low, high = CALIBRATION_BOUNDS[key]
+        return round(min(max(value, low), high), 2)
+
+    means = [r["mean_words"] for _, r in rows]
+    shorts = [r["short_share"] for _, r in rows]
+    commas = [r["commas_per_sentence"] for _, r in rows]
+    longs = [r["over_long"] / max(r["sentences"], 1) for _, r in rows]
+    suggestion = {
+        # A quarter above the typical mean still reads as Jed. Further than that reads stiff.
+        "mean_cap": clamp("mean_cap", statistics.median(means) * 1.25),
+        # Half of the usual share of short sentences is the least that still has rhythm.
+        "short_floor": clamp("short_floor", statistics.median(shorts) * 0.5),
+        # A quarter above the usual comma rate is the ceiling before it reads as chained clauses.
+        "max_commas": clamp("max_commas", statistics.median(commas) * 1.25),
+        # Allow about twice the usual rate of very long sentences, at the 30 word floor.
+        "long_cap": clamp("long_cap", 30 if statistics.median(longs) < 0.03 else 35),
+        "files": len(rows),
+    }
+    return rows, suggestion
+
+
+def load_calibration(path):
+    try:
+        data = json.loads(Path(path).expanduser().read_text())
+    except (OSError, ValueError):
+        return None
+    return data if isinstance(data, dict) else None
 
 
 # ---------------------------------------------------------------------------
@@ -434,6 +706,15 @@ def analyse(raw, register="general", suffix=""):
 # ---------------------------------------------------------------------------
 
 def summary_line(r):
+    line = _summary(r)
+    if r.get("spoken_seconds") is not None:
+        line += " Spoken: about %d words, %d seconds at %d wpm." % (r["spoken_words"], r["spoken_seconds"], SPOKEN_WPM)
+    if r.get("calibrated"):
+        line += " Calibrated."
+    return line
+
+
+def _summary(r):
     return ("[%s] AI check: %s (score %.1f). %d words, %d sentences, mean %.1f / median %.0f words, "
             "%.0f%% under %d, %d over %s, %.2f commas per sentence, %d dashes, %d banned words, %d other tells."
             % (r["register"], r["verdict"], r["score"], r["words"], r["sentences"], r["mean_words"],
@@ -469,12 +750,41 @@ def main(argv=None):
     ap.add_argument("--quiet", action="store_true", help="print only the summary line")
     ap.add_argument("--json", action="store_true", help="print the full result as JSON")
     ap.add_argument("--list-registers", action="store_true", help="list the registers and exit")
+    ap.add_argument("--facts", metavar="FILE", help="a file of the facts the draft is allowed to use. Numbers not in it are flagged")
+    ap.add_argument("--facts-text", metavar="TEXT", help="the same, given inline")
+    ap.add_argument("--target-seconds", type=int, metavar="N", help="for scripts: flag a spoken length that misses N seconds by more than 15 percent")
+    ap.add_argument("--fix", action="store_true", help="print the text with safe mechanical fixes applied")
+    ap.add_argument("--in-place", action="store_true", help="with --fix, write the result back to the file")
+    ap.add_argument("--baseline", metavar="DIR", help="measure a folder of your own writing and suggest thresholds")
+    ap.add_argument("--save", action="store_true", help="with --baseline, save the thresholds to %s" % CALIBRATION_PATH)
+    ap.add_argument("--calibration", metavar="FILE", help="thresholds to use instead of the saved ones")
+    ap.add_argument("--no-calibration", action="store_true", help="ignore any saved thresholds")
     ap.add_argument("--version", action="version", version="ai_check " + __version__)
     args = ap.parse_args(argv)
 
     if args.list_registers:
         for name in sorted(REGISTERS):
             print("%-9s %s" % (name, REGISTER_HELP[name]))
+        return 0
+    if args.baseline:
+        rows, suggestion = measure_folder(args.baseline)
+        if not rows:
+            print("ai_check: no .md, .txt, .docx or .pptx files with enough sentences in %s" % args.baseline, file=sys.stderr)
+            return 2
+        print("%-34s %6s %7s %7s %7s" % ("file", "words", "mean", "short", "commas"))
+        for name, r in rows:
+            print("%-34s %6d %7.1f %6.0f%% %7.2f" % (name[:34], r["words"], r["mean_words"], r["short_share"] * 100, r["commas_per_sentence"]))
+        print("\nSuggested thresholds from %d files (defaults in brackets):" % suggestion["files"])
+        print("  mean_cap    %-5s [%s]" % (suggestion["mean_cap"], DEFAULT_MEAN_CAP))
+        print("  long_cap    %-5s [%s]" % (suggestion["long_cap"], DEFAULT_LONG_CAP))
+        print("  short_floor %-5s [0.05 to 0.20 by register]" % suggestion["short_floor"])
+        print("  max_commas  %-5s [%s]" % (suggestion["max_commas"], MAX_COMMAS_PER_SENTENCE))
+        if args.save:
+            CALIBRATION_PATH.parent.mkdir(parents=True, exist_ok=True)
+            CALIBRATION_PATH.write_text(json.dumps(suggestion, indent=2) + "\n")
+            print("\nSaved to %s. It stays on this machine and is used on later checks." % CALIBRATION_PATH)
+        else:
+            print("\nAdd --save to keep these. Only measure writing you wrote yourself.")
         return 0
     if not args.file:
         ap.error("give a file to check, or - to read stdin")
@@ -487,7 +797,33 @@ def main(argv=None):
 
     suffix = Path(args.file).suffix.lower() if args.file != "-" else ""
     register = args.register or ("code" if suffix in CODE_EXT else "general")
-    result = analyse(raw, register, suffix)
+
+    if args.fix:
+        if suffix in CODE_EXT or suffix in (".docx", ".pptx"):
+            print("ai_check: --fix works on text and Markdown files only", file=sys.stderr)
+            return 2
+        fixed, counts = fix_text(raw)
+        note = ", ".join("%s x%d" % (k, v) for k, v in sorted(counts.items())) or "nothing to fix"
+        if args.in_place and args.file != "-":
+            Path(args.file).write_text(fixed, encoding="utf8")
+            print("ai_check: fixed %s (%s)" % (args.file, note), file=sys.stderr)
+        else:
+            sys.stdout.write(fixed)
+            print("\nai_check: %s. Dashes and word choices are left for you." % note, file=sys.stderr)
+        return 0
+
+    facts = args.facts_text or ""
+    if args.facts:
+        try:
+            facts += "\n" + Path(args.facts).expanduser().read_text(encoding="utf8", errors="replace")
+        except OSError as e:
+            print("ai_check: cannot read facts file %s: %s" % (args.facts, e), file=sys.stderr)
+            return 2
+
+    calibration = None
+    if not args.no_calibration and not os.environ.get("SIGNATURE_NO_CALIBRATION"):
+        calibration = load_calibration(args.calibration or CALIBRATION_PATH)
+    result = analyse(raw, register, suffix, facts=facts or None, target_seconds=args.target_seconds, calibration=calibration)
 
     if args.json:
         print(json.dumps(result, indent=2))

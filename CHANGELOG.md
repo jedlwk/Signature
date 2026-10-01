@@ -1,5 +1,27 @@
 # Changelog
 
+## 2.1.0
+
+Driven by the first real eval run (7 scenarios, with and without the skill, on Haiku, Sonnet and Opus).
+Results are in `evals/RESULTS.md`.
+
+- **Invented facts** were the most common failure, so the checker now has `--facts` and `--facts-text`.
+  Any number in the draft that is not in the facts is flagged, and spelled-out numbers are matched
+  ("ten thousand" equals 10,000).
+- **Script length** missed the target in every run, and the skill runs were shorter than the baseline.
+  The checker now counts only spoken words and takes `--target-seconds`. It says how many words the
+  target needs.
+- **Audit mode** groups findings P0, P1, P2. **Polish mode** keeps casing and "!!" in casual messages.
+- The code reference has a delete-the-comment test for what versus why.
+- `samples.md` warns against copying phrases, after a run copied one verbatim.
+- New slash commands: `/signature:check`, `/signature:polish`, `/signature:learn`.
+- `/signature:learn` turns Jed's edits into proposed rules, with a private local log.
+- Checker: `--fix` for safe mechanical fixes only (curly quotes, "in order to", and similar),
+  `--baseline` to measure Jed's own writing and `--save` to keep calibrated thresholds, plus checks
+  for a phrase repeated three times and for paragraphs that are all the same length.
+- GitHub Actions: tests on every push, and a release workflow that attaches a zip of the skill.
+- MIT license.
+
 ## 2.0.0
 
 Restructured to follow Anthropic's skill authoring guide and what the best writing skills do.

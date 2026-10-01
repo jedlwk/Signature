@@ -11,8 +11,9 @@ REMINDER = (
     "Writing rule for this session: anything written under Jed's name (code comments, commit messages, "
     "READMEs, docs, slides, scripts, posts, messages, assignments) follows the jed-writing-style skill. "
     "Load it before drafting. Core rules: warm and plain, point first, no em or en dashes, under one comma "
-    "per sentence, no semicolons, no LLM words or tidy groups of three, never invent facts. Run the "
-    "skill's scripts/ai_check.py on finished drafts. Local project rules (CLAUDE.md, rubrics, repo "
+    "per sentence, no semicolons, no LLM words or tidy groups of three. Use only the facts Jed gave you: "
+    "no invented numbers, anecdotes or advice. Run the skill's scripts/ai_check.py (with --facts-text, and "
+    "--target-seconds for scripts) on finished drafts. Local project rules (CLAUDE.md, rubrics, repo "
     "conventions) win where they differ."
 )
 

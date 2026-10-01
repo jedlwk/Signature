@@ -30,7 +30,7 @@ it more simply. Shorter beats longer, but never so thin that the substance goes.
 | **Fair** | "Codex speeds up the build. h2oGPTe runs the app." | Putting another tool, team or vendor down. |
 | **Modest with claims** | Real, checked numbers only. | Hype, round invented figures, "100 people trained" with no source. |
 
-State plainly, ask gently. Jed is direct when telling a story or reporting a result. He softens on
+State plainly, ask gently. Jed is direct when telling a story or reporting a result. Jed softens on
 purpose when questioning someone senior.
 
 ## Word choice
@@ -112,7 +112,7 @@ paragraph, it is a habit and it reads as generated.
 ## Spelling and local touches
 
 - **British and Singapore spelling by default** in finished work: realised, programme, organisation,
-  colour, judgement, licence. Jed sometimes types American in chat. Don't fight it in his own text.
+  colour, judgement, licence. Jed sometimes types American in chat. Don't fight it in Jed's own text.
 - **Singapore context is fine.** S$ figures, SG dates ("Fri 2 Oct, 9.05am"), NUS, MOM, island-wide.
 - **Singlish is chat only.** "dun", "alr", "cuz", "chim" never go into a deliverable.
 - **Personal details** go in only when they are true and connect. Never invent an anecdote.

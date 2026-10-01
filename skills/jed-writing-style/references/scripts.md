@@ -25,11 +25,22 @@ Evidence for this material is thinner than for documents, so some parts are *lik
   fine here, even though they would be filler in a document.
 - **Point at the screen, don't describe it.** Say what matters and let the screen show the rest.
 - **Warm, not performed.** No stage-voice phrases like "Imagine a world where".
+- **No invented colour.** Don't add an anecdote ("one team I worked with"), a time of day, a
+  headcount or a derived figure to make it vivid. Use only what Jed gave you, or leave a
+  placeholder such as [a short story from the project].
 - **End on the next step or a real question.** A plain "thank you" is fine. A slogan is not.
 
 ## Length and timing
 
-Speak at about 130 to 150 words a minute. Use 140 to plan.
+Speak at about 130 to 150 words a minute. Use 140 to plan. Don't guess the length. Measure it.
+Testing showed every draft landing 10 to 35 percent short of the target, so run:
+
+```bash
+python3 scripts/ai_check.py script.md --register script --target-seconds 90
+```
+
+It counts only the spoken words (not `[Slide 1]` labels or the length line) and says how many words
+the target needs. Quote the checker's number in the length line, not your own estimate.
 
 | Length | Words |
 |---|---|
@@ -76,7 +87,7 @@ Square brackets are for the slide labels only. They are never spoken.
 
 ## Checklist
 
-- [ ] Estimated length stated, and inside the limit
+- [ ] Estimated length stated from the checker, and inside the limit (`--target-seconds`)
 - [ ] Opens on a real question or moment
 - [ ] Mean about 10 words, none over 25
 - [ ] No brackets, slashes, abbreviations or ampersands in the spoken lines

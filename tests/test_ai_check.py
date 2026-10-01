@@ -5,6 +5,7 @@ Run from the repo root:
     python3 -m unittest discover -s tests -v
 """
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -119,6 +120,15 @@ class IndividualRules(unittest.TestCase):
         self.assertIn("open loop", labels(run(text, "customer")))
         self.assertNotIn("open loop", labels(run(text, "message")))
 
+    def test_discovery_voice_catches_contractions(self):
+        r = run("The order is preserved in every request we've tested.", "customer")
+        self.assertIn("discovery voice", labels(r))
+
+    def test_invented_anecdote(self):
+        for text in ("One team I worked with had a backlog.", "I once saw a reviewer cry.", "A friend of mine hired fast."):
+            with self.subTest(text):
+                self.assertIn("invented anecdote", labels(run(text)))
+
     def test_script_unspeakable(self):
         r = run("Use LLMs (large models), e.g. GPT & friends and/or others.", "script")
         self.assertIn("unspeakable", labels(r))
@@ -196,7 +206,8 @@ class OfficeFiles(unittest.TestCase):
 
 class CommandLine(unittest.TestCase):
     def call(self, *args, stdin=None):
-        return subprocess.run([sys.executable, str(SCRIPT), *args], input=stdin, capture_output=True, text=True)
+        env = dict(os.environ, SIGNATURE_NO_CALIBRATION="1")  # a saved calibration must not change test results
+        return subprocess.run([sys.executable, str(SCRIPT), *args], input=stdin, capture_output=True, text=True, env=env)
 
     def test_exit_code_clean(self):
         p = self.call(str(FIXTURES / "human/linkedin_hr.txt"), "--register", "post", "--quiet")
@@ -232,6 +243,150 @@ class CommandLine(unittest.TestCase):
         p = self.call("--list-registers")
         for name in ("code", "doc", "customer", "course", "slides", "script", "post", "message", "general"):
             self.assertIn(name, p.stdout)
+
+
+class FactsCheck(unittest.TestCase):
+    """The top failure in the evals was invented figures, so numbers are checked against the facts given."""
+
+    FACTS = "30 HR leaders, 10,000 documents a month"
+
+    def numbers(self, text, register="post", facts=None):
+        r = ai_check.analyse(text, register, "", facts=facts or self.FACTS)
+        return [f["snippet"] for f in r["findings"] if f["label"] == "number not in facts"]
+
+    def test_given_numbers_pass(self):
+        self.assertEqual(self.numbers("30 HR leaders read 10,000 documents a month."), [])
+
+    def test_invented_numeral_is_flagged(self):
+        self.assertEqual(self.numbers("We saved 45 hours."), ["45"])
+
+    def test_spelled_out_numbers_match_numerals(self):
+        self.assertEqual(self.numbers("Ten thousand documents. Thirty HR leaders."), [])
+
+    def test_invented_spelled_out_number_is_flagged(self):
+        self.assertTrue(self.numbers("Ten thousand becomes twelve thousand."))
+
+    def test_small_numbers_are_ignored(self):
+        self.assertEqual(self.numbers("Two routes, step 3, five minutes."), [])
+
+    def test_percent_and_decimals(self):
+        self.assertTrue(self.numbers("Accuracy rose to 94.5 percent."))
+
+    def test_off_by_default(self):
+        r = ai_check.analyse("We saved 45 hours.", "post", "")
+        self.assertNotIn("number not in facts", labels(r))
+
+    def test_script_labels_are_not_claims(self):
+        text = "Estimated length: about 180 words\n\n[Slide 1]\nTen thousand documents a month."
+        self.assertEqual(self.numbers(text, "script"), [])
+
+
+class SpokenLength(unittest.TestCase):
+    def script(self, words):
+        return "Estimated length: test\n\n[Slide 1]\n" + " ".join(["word."] * words)
+
+    def test_counts_only_spoken_words(self):
+        r = ai_check.analyse(self.script(140), "script", "")
+        self.assertEqual(r["spoken_words"], 140)
+        self.assertEqual(r["spoken_seconds"], 60)
+
+    def test_target_met(self):
+        r = ai_check.analyse(self.script(210), "script", "", target_seconds=90)
+        self.assertNotIn("spoken length", labels(r))
+
+    def test_target_missed_says_how_many_words(self):
+        r = ai_check.analyse(self.script(130), "script", "", target_seconds=90)
+        f = [f for f in r["findings"] if f["label"] == "spoken length"][0]
+        self.assertIn("210 words", f["advice"])
+
+    def test_only_scripts_get_a_spoken_length(self):
+        self.assertIsNone(ai_check.analyse("Plain text.", "doc", "")["spoken_seconds"])
+
+
+class SafeFixes(unittest.TestCase):
+    def test_rewrites_wordy_phrases_and_keeps_case(self):
+        fixed, counts = ai_check.fix_text("In order to help, we utilize it due to the fact that it works.")
+        self.assertEqual(fixed, "To help, we use it because it works.")
+        self.assertEqual(sum(counts.values()), 3)
+
+    def test_curly_quotes(self):
+        fixed, _ = ai_check.fix_text("He said \u201chi\u201d and it\u2019s fine.")
+        self.assertEqual(fixed, 'He said "hi" and it\'s fine.')
+
+    def test_code_links_and_ignored_text_are_untouched(self):
+        raw = ("Use `in order to` here. See http://x.com/in-order-to.\n```\nin order to\n```\n"
+               "<!-- signature:ignore-start -->\nin order to\n<!-- signature:ignore-end -->\n"
+               "in order to <!-- signature:ignore-line -->\n")
+        fixed, counts = ai_check.fix_text(raw)
+        self.assertEqual(fixed, raw)
+        self.assertEqual(counts, {})
+
+    def test_dashes_are_never_auto_fixed(self):
+        raw = "It works \u2014 mostly."
+        self.assertEqual(ai_check.fix_text(raw)[0], raw)
+
+    def test_cli_refuses_code_files(self):
+        p = subprocess.run([sys.executable, str(SCRIPT), str(FIXTURES / "human/code_clean.py"), "--fix"],
+                           capture_output=True, text=True)
+        self.assertEqual(p.returncode, 2)
+
+
+class CheapPatternChecks(unittest.TestCase):
+    def test_repeated_phrase(self):
+        text = ("The team shipped the new tool. " * 3) + "Then everyone went home."
+        self.assertIn("repeated phrase", labels(run(text)))
+
+    def test_uniform_paragraphs(self):
+        para = " ".join(["word"] * 30) + "."
+        self.assertIn("uniform paragraphs", labels(run("\n\n".join([para] * 5))))
+
+    def test_varied_paragraphs_pass(self):
+        paras = [" ".join(["word"] * n) + "." for n in (18, 45, 22, 60, 30)]
+        self.assertNotIn("uniform paragraphs", labels(run("\n\n".join(paras))))
+
+    def test_human_fixtures_do_not_trip_them(self):
+        for name in ("human/linkedin_hr.txt", "human/customer_answer.md"):
+            r = run((FIXTURES / name).read_text(), "post")
+            self.assertTrue({"repeated phrase", "uniform paragraphs"}.isdisjoint(labels(r)), name)
+
+
+class Calibration(unittest.TestCase):
+    def write_folder(self, texts):
+        d = Path(tempfile.mkdtemp())
+        for i, t in enumerate(texts):
+            (d / ("w%d.md" % i)).write_text(t)
+        return d
+
+    def test_measure_folder_suggests_bounded_thresholds(self):
+        text = " ".join(["This is a short plain sentence about the work."] * 12)
+        rows, suggestion = ai_check.measure_folder(self.write_folder([text, text]))
+        self.assertEqual(len(rows), 2)
+        for key, (low, high) in ai_check.CALIBRATION_BOUNDS.items():
+            self.assertTrue(low <= suggestion[key] <= high, key)
+
+    def test_empty_folder(self):
+        rows, suggestion = ai_check.measure_folder(self.write_folder([]))
+        self.assertEqual((rows, suggestion), ([], {}))
+
+    def test_calibration_changes_prose_limits_only(self):
+        long_ish = " ".join(["word"] * 20) + ". "
+        text = long_ish * 8
+        default = ai_check.analyse(text, "doc", "")
+        tuned = ai_check.analyse(text, "doc", "", calibration={"mean_cap": 24})
+        self.assertTrue(default["rhythm"])
+        self.assertFalse([r for r in tuned["rhythm"] if "Mean sentence" in r])
+        script = ai_check.analyse(text, "script", "", calibration={"mean_cap": 24})
+        self.assertTrue([r for r in script["rhythm"] if "Mean sentence" in r])
+
+    def test_calibration_is_bounded(self):
+        limits = ai_check.effective_limits(ai_check.REGISTERS["doc"], "doc", {"mean_cap": 999})
+        self.assertEqual(limits["mean_cap"], ai_check.CALIBRATION_BOUNDS["mean_cap"][1])
+
+    def test_cli_baseline(self):
+        d = self.write_folder([" ".join(["This is a short plain sentence about the work."] * 12)])
+        p = subprocess.run([sys.executable, str(SCRIPT), "--baseline", str(d)], capture_output=True, text=True)
+        self.assertEqual(p.returncode, 0)
+        self.assertIn("mean_cap", p.stdout)
 
 
 class DocsPracticeWhatTheyPreach(unittest.TestCase):
@@ -286,6 +441,65 @@ class SkillShape(unittest.TestCase):
                     "evals/evals.json"):
             with self.subTest(rel):
                 json.loads((ROOT / rel).read_text())
+
+
+class PluginShape(unittest.TestCase):
+    """Static checks for what `claude plugin validate` would look at, so a bad manifest fails in CI."""
+
+    def load(self, rel):
+        return json.loads((ROOT / rel).read_text())
+
+    def test_manifest_and_marketplace_agree(self):
+        plugin = self.load(".claude-plugin/plugin.json")
+        market = self.load(".claude-plugin/marketplace.json")
+        self.assertEqual(market["name"], plugin["name"])
+        self.assertIn(plugin["name"], [p["name"] for p in market["plugins"]])
+        for entry in market["plugins"]:
+            self.assertTrue((ROOT / entry["source"]).exists())
+
+    def test_components_live_at_the_root_not_in_the_manifest_folder(self):
+        self.assertEqual(sorted(p.name for p in (ROOT / ".claude-plugin").iterdir()),
+                         ["marketplace.json", "plugin.json"])
+        for folder in ("skills", "commands", "hooks"):
+            self.assertTrue((ROOT / folder).is_dir(), folder)
+
+    def test_version_matches_changelog(self):
+        version = self.load(".claude-plugin/plugin.json")["version"]
+        first = [l for l in (ROOT / "CHANGELOG.md").read_text().splitlines() if l.startswith("## ")][0]
+        self.assertEqual(first, "## " + version)
+
+    def test_hook_points_at_a_real_script_and_prints_valid_json(self):
+        hooks = self.load("hooks/hooks.json")["hooks"]["SessionStart"]
+        command = hooks[0]["hooks"][0]["command"]
+        self.assertIn("${CLAUDE_PLUGIN_ROOT}", command)
+        script = ROOT / "hooks" / "remind.py"
+        self.assertTrue(script.exists())
+        out = subprocess.run([sys.executable, str(script)], capture_output=True, text=True)
+        payload = json.loads(out.stdout)["hookSpecificOutput"]
+        self.assertEqual(payload["hookEventName"], "SessionStart")
+        self.assertLess(len(payload["additionalContext"]), 1200)
+
+    def test_commands_have_a_description_and_use_the_plugin_root(self):
+        commands = sorted((ROOT / "commands").glob("*.md"))
+        self.assertGreaterEqual(len(commands), 3)
+        for path in commands:
+            with self.subTest(path.name):
+                text = path.read_text()
+                self.assertTrue(text.startswith("---\n"))
+                head = text.split("---")[1]
+                self.assertIn("description:", head)
+                if path.stem in ("check", "polish"):
+                    self.assertIn("${CLAUDE_PLUGIN_ROOT}/skills/jed-writing-style/scripts/ai_check.py", text)
+
+    def test_every_script_path_in_the_docs_exists(self):
+        for path in [ROOT / "README.md", SKILL / "SKILL.md"] + sorted((SKILL / "references").glob("*.md")):
+            for rel in set(__import__("re").findall(r"scripts/([a-z_]+\.py)", path.read_text())):
+                with self.subTest(path.name + " " + rel):
+                    self.assertTrue((SKILL / "scripts" / rel).exists())
+
+    def test_license_and_ci_exist(self):
+        for rel in ("LICENSE", ".github/workflows/test.yml", ".github/workflows/release.yml"):
+            self.assertTrue((ROOT / rel).exists(), rel)
 
 
 if __name__ == "__main__":

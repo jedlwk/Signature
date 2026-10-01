@@ -1,6 +1,6 @@
 ---
 name: jed-writing-style
-description: Applies Jed's writing voice and anti-AI rules to anything written under Jed's name, with separate rules for code, documents, slides, scripts and posts, plus a checker that flags AI tells. Use when drafting, rewriting, polishing or reviewing code comments, commit messages, READMEs, customer docs and Q&A, reports, course assignments, slides, speaker scripts, LinkedIn or Medium posts, emails, messages, peer comments, taglines or names. Also use when Jed asks to sound less like AI, keep his tone, or run an AI check or AI score.
+description: Applies Jed's writing voice and anti-AI rules to anything written under Jed's name, with separate rules for code, documents, slides, scripts and posts, plus a checker that flags AI tells. Use when drafting, rewriting, polishing or reviewing code comments, commit messages, READMEs, customer docs and Q&A, reports, course assignments, slides, speaker scripts, LinkedIn or Medium posts, emails, messages, peer comments, taglines or names. Also use when Jed asks to sound less like AI, keep Jed's tone, or run an AI check or AI score.
 ---
 
 # Write like Jed
@@ -22,7 +22,8 @@ the rest of this guide.
    closing summaries, slogans or hollow praise.
 8. Warm, never gushing. Confident from knowing. Hedge once, only where the evidence is weak.
 9. Fair to every tool and team named. No hype.
-10. Never invent a number, quote, name, citation or anecdote. Ask if a fact is missing.
+10. Use only the facts you were given. Never invent a number, quote, name, example, anecdote or
+    claim. If one is missing, use a placeholder like [number] or ask.
 11. End on the fact, the next step or a real question. Never a flourish.
 12. British and Singapore spelling.
 
@@ -31,9 +32,9 @@ the rest of this guide.
 | Jed says | Mode | What to do |
 |---|---|---|
 | "write", "draft", "make me" | **Draft** | Write new text in the voice. Short first. |
-| "polish", "tidy", "keep my tone" | **Polish** | Change as little as possible. Keep Jed's phrasing. |
+| "polish", "tidy", "keep my tone" | **Polish** | Change as little as possible. Keep Jed's phrasing, casing and "!!" in casual messages. Fix spelling and clear mistakes only. |
 | "rewrite", "too AI", "fix this" | **Rewrite** | Rebuild AI-sounding text from what it is trying to say. |
-| "check", "AI score", "review" | **Audit** | Run the checker and report findings. Don't rewrite unless asked. |
+| "check", "AI score", "review" | **Audit** | Run the checker. Report findings grouped P0, then P1, then P2. Don't rewrite unless asked. |
 | "give me options", names, taglines | **Options** | Give 3 to 5 real options and say which you would pick. |
 
 ## Open the right reference
@@ -61,9 +62,9 @@ Copy this checklist and tick it off.
 
 ```
 - [ ] 1. Find the material and the mode. Open its reference.
-- [ ] 2. Check the facts you have. Ask for anything missing. Never invent.
+- [ ] 2. List the facts Jed gave you. Anything not on the list needs a placeholder or a question.
 - [ ] 3. Draft short. Jed usually cuts a normal first draft by half, so start there.
-- [ ] 4. Run the checker with the right register.
+- [ ] 4. Run the checker with the right register and the facts.
 - [ ] 5. Fix every flag that isn't a deliberate choice. Fix the sentence, not just the word.
 - [ ] 6. Reread the ending of each paragraph. The checker cannot judge a flourish.
 - [ ] 7. Run the checker once more. Stop after two passes.
@@ -73,11 +74,14 @@ Copy this checklist and tick it off.
 Run the checker from this skill's folder. Use the base directory shown when the skill loads.
 
 ```bash
-python3 scripts/ai_check.py draft.md --register doc
+python3 scripts/ai_check.py draft.md --register doc --facts-text "30 HR leaders, 10,000 documents"
 ```
 
-It reads `.md`, `.txt`, `.docx`, `.pptx` and source files (comments only), or stdin with `-`. Add
-`--json` for machine output.
+`--facts-text` flags any number in the draft that isn't in the facts. Invented figures were the most
+common failure in testing, so always pass it. For scripts add `--target-seconds 90` (or the length
+asked for). `--fix` prints the text with safe mechanical fixes only. The checker reads `.md`,
+`.txt`, `.docx`, `.pptx` and source files (comments only), or stdin with `-`. Add `--json` for
+machine output.
 
 Report like this: "AI check: clean. No dashes, 11 words per sentence on average." Don't paste the full
 report unless Jed asks. If a finding is a deliberate choice, say so in a few words.
@@ -93,16 +97,28 @@ text. The goal is writing that sounds like Jed, not text that games a detector.
 
 ## Guardrails
 
-- **Never invent facts.** If a number, name, date, quote or example is missing, ask. Don't fill a gap
-  with something plausible.
+- **Never invent facts.** If a number, name, date, quote, example or anecdote is missing, use a
+  placeholder or ask. Don't fill a gap with something plausible, and don't add advice, features or
+  results the facts don't support. A derived number ("about 500 a day") is still an invented claim.
+- **Don't borrow phrases from the samples.** They show the rhythm and warmth. Copying "had the
+  privilege of" into every post turns a habit into a tic.
 - **Never put another tool, team or person down.**
 - **Keep the meaning.** Cutting words must not cut the substance or the caveat that matters.
 - **Sensitive data stays out.** Use generic names for clients and people unless Jed gave the name
   for this piece.
-- **When polishing Jed's own text,** keep his words. Fix only what the rules require.
+- **When polishing Jed's own text,** keep Jed's words. Fix only what the rules require.
 - **When unsure between two options,** pick the shorter and plainer one and say so in a line.
+
+## Commands
+
+- `/signature:check <file or text>` runs the checker and reports findings. No rewrite.
+- `/signature:polish <file or text>` polishes with minimal changes, then checks.
+- `/signature:learn` compares what Claude wrote with what Jed changed it to, and proposes a rule or
+  an example. It asks before writing, and keeps the log private.
 
 ## Keep this up to date
 
-If Jed corrects something this guide doesn't cover, say so in one line and offer to add it to the
-right reference file. Jed's own repeated corrections are the best evidence this guide has.
+If Jed corrects something this guide doesn't cover, say so in one line and offer to run
+`/signature:learn`. Jed's own repeated corrections are the best evidence this guide has. If a private
+log exists at `$CLAUDE_PLUGIN_DATA/corrections.md` or `~/.claude/signature/corrections.md`, skim it
+before drafting.

@@ -1,0 +1,81 @@
+{
+  "about": "Queries for checking the skill description. Show a model the description next to other skills' descriptions and ask which it would load. should_trigger is what the skill should do. Add a query whenever the skill loads when it shouldn't, or stays quiet when it should.",
+  "queries": [
+    {
+      "query": "Draft a LinkedIn post about our hackathon.",
+      "should_trigger": true
+    },
+    {
+      "query": "Can you make this README sound less like AI?",
+      "should_trigger": true
+    },
+    {
+      "query": "Write the speaker notes for slide 4.",
+      "should_trigger": true
+    },
+    {
+      "query": "Polish this email to the customer but keep my tone.",
+      "should_trigger": true
+    },
+    {
+      "query": "AI check this paragraph.",
+      "should_trigger": true
+    },
+    {
+      "query": "Add a short comment above this function.",
+      "should_trigger": true
+    },
+    {
+      "query": "Write my discussion post for lesson 8.",
+      "should_trigger": true
+    },
+    {
+      "query": "Write the commit message for these changes.",
+      "should_trigger": true
+    },
+    {
+      "query": "Give me 5 names for this demo app.",
+      "should_trigger": true
+    },
+    {
+      "query": "Rewrite my cover note, it sounds too robotic.",
+      "should_trigger": true
+    },
+    {
+      "query": "Fix the failing test in test_parser.py.",
+      "should_trigger": false
+    },
+    {
+      "query": "What does this regular expression do?",
+      "should_trigger": false
+    },
+    {
+      "query": "Turn this CSV into a spreadsheet with a pivot table.",
+      "should_trigger": false
+    },
+    {
+      "query": "Summarise this PDF for me.",
+      "should_trigger": false
+    },
+    {
+      "query": "Explain how transformers work.",
+      "should_trigger": false
+    },
+    {
+      "query": "Run the migration script and tell me if it passes.",
+      "should_trigger": false
+    },
+    {
+      "query": "Translate this paragraph into Chinese.",
+      "should_trigger": false
+    },
+    {
+      "query": "What's the weather in Singapore tomorrow?",
+      "should_trigger": false
+    },
+    {
+      "query": "Refactor this function to use a dict instead of if/elif.",
+      "should_trigger": false
+    }
+  ]
+}

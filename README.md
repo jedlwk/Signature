@@ -1,5 +1,8 @@
 # Signature
 
+[![test](https://github.com/jedlwk/Signature/actions/workflows/test.yml/badge.svg)](https://github.com/jedlwk/Signature/actions/workflows/test.yml)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 My writing voice, packaged as a Claude Code plugin. Every session starts knowing how I write, so I
 stop typing "make it sound less AI" and "check the AI score".
 
@@ -66,6 +69,17 @@ For tools that can't load a plugin, paste the short version from [docs/paste-pro
   makes no network calls. Delete the `hooks` folder if you don't want it.
 - A folder's own CLAUDE.md, a rubric, a template or a repo convention beats this guide where they differ.
 
+## Commands
+
+| Command | What it does |
+|---|---|
+| `/signature:check <file or text>` | Runs the checker and reports findings, grouped by priority. No rewrite. |
+| `/signature:polish <file or text>` | Polishes with minimal changes, then checks. |
+| `/signature:learn` | Compares what Claude wrote with what I changed it to, and proposes a rule or an example. Asks before writing. |
+
+`/signature:learn` keeps a private log of my corrections on my machine, in `~/.claude/signature/`. It is
+never committed. Anything confidential is replaced with a placeholder before it is saved.
+
 ## Modes
 
 | I say | Mode | What happens |
@@ -75,6 +89,18 @@ For tools that can't load a plugin, paste the short version from [docs/paste-pro
 | "rewrite", "too AI" | Rewrite | Rebuilt from what the text is trying to say |
 | "check", "AI score" | Audit | Findings only, no rewrite |
 | names, taglines | Options | Three to five real options and a pick |
+
+## How well it works
+
+I ran seven writing tasks with and without the skill, on Haiku, Sonnet and Opus, then fixed what
+failed and ran them again. On a 41 line rubric, plain Sonnet met 27 lines. With the skill, Sonnet
+went from 36 to 40, Haiku from 28 to 36 and Opus from 38 to 41. The biggest wins were not inventing
+facts, hitting a script's length, and keeping my tone when polishing. The skill's description routed
+19 of 19 test requests correctly.
+
+Two honest limits. Haiku still invents details, so use Sonnet or Opus to write under my name. And
+these are single runs scored by one reader, so treat the numbers as a direction. The full write-up,
+the caveats and the raw outputs are in [evals/RESULTS.md](evals/RESULTS.md).
 
 ## What changes by material
 
@@ -107,6 +133,38 @@ python3 skills/jed-writing-style/scripts/ai_check.py app.py
 pbpaste | python3 skills/jed-writing-style/scripts/ai_check.py - --register post
 ```
 
+Options worth knowing:
+
+```bash
+python3 skills/jed-writing-style/scripts/ai_check.py post.md --register post --facts-text "30 HR leaders, no code"
+```
+
+`--facts-text` (or `--facts FILE`) flags any number in the draft that is not in the facts. Invented
+figures were the most common failure in testing. Spelled-out numbers match: "ten thousand" equals 10,000.
+
+```bash
+python3 skills/jed-writing-style/scripts/ai_check.py script.md --register script --target-seconds 90
+```
+
+For scripts, this counts only the spoken words and says how many words the target needs.
+
+```bash
+python3 skills/jed-writing-style/scripts/ai_check.py draft.md --fix
+```
+
+`--fix` prints the text with safe mechanical fixes only: curly quotes, "in order to", "due to the fact
+that" and a few more. It leaves code, links and ignored passages alone. Dashes and word choices stay
+manual, because the right replacement depends on the sentence. Add `--in-place` to write the file back.
+
+```bash
+python3 skills/jed-writing-style/scripts/ai_check.py --baseline ~/my-writing --save
+```
+
+`--baseline` measures a folder of writing I wrote myself and suggests thresholds for sentence length
+and commas. `--save` keeps them in `~/.claude/signature/calibration.json`, and later checks use them.
+It stays on my machine. Only measure your own writing, because measuring text Claude wrote would just
+teach the checker Claude's habits.
+
 It needs only Python 3. It reads `.md`, `.txt`, `.docx`, `.pptx` and source files (comments and
 docstrings only).
 
@@ -134,6 +192,8 @@ signature/
 ├── .claude-plugin/
 │   ├── plugin.json            plugin manifest
 │   └── marketplace.json       lets /plugin marketplace add find it
+├── commands/                  /signature:check, :polish, :learn
+├── .github/workflows/         tests on every push, zip of the skill on a release tag
 ├── skills/jed-writing-style/
 │   ├── SKILL.md               front page: quick card, modes, workflow
 │   ├── references/            loaded only when needed
@@ -148,10 +208,11 @@ signature/
 │   │   └── samples.md         real writing to match by ear
 │   └── scripts/ai_check.py    the checker
 ├── hooks/                     session-start reminder
-├── evals/                     scenarios to compare with and without the skill
+├── evals/                     scenarios, trigger queries and results
 ├── tests/                     unit tests and fixtures
 ├── docs/paste-prompt.md       short version for other tools
 ├── CHANGELOG.md
+├── LICENSE
 └── README.md
 ```
 
@@ -164,8 +225,13 @@ python3 -m unittest discover -s tests -v
 ```
 
 They cover the checker, check that approved writing of mine stays clean and AI-flavoured text gets
-flagged, and check that the skill's own docs pass the checker. They also check the skill against
+flagged, and check that the skill's own docs pass the checker. They check the skill against
 Anthropic's authoring rules: the frontmatter, the length of `SKILL.md`, and references one level deep.
+They also check the plugin itself: the manifests agree, the hook points at a real script, and the
+commands are well formed. That stands in for `claude plugin validate`, which I could not run.
+
+GitHub Actions runs the tests on every push. Pushing a tag such as `v2.1.0` attaches a zip of the
+skill to a release, ready to upload to Claude.ai.
 
 To change the voice, edit the matching file in `references/`. Keep `SKILL.md` short. Then bump
 `version` in `.claude-plugin/plugin.json`, add a line to the changelog, and run:
@@ -210,4 +276,7 @@ Rhetorical questions and deliberate repetition stay when I choose them.
   posts. Those parts are marked as likely in the references.
 - The checker finds patterns. It cannot judge a flourish at the end of a paragraph, so the skill
   rereads endings by hand.
+- Haiku follows the mechanics but still invents content. Use Sonnet or Opus for drafting. Haiku is
+  fine for running the checker and for audits.
+- The facts check catches invented numbers. It cannot catch an invented anecdote, so read the draft.
 - The voice is mine. It will sound off on someone else's work unless the two files above are replaced.

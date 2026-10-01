@@ -29,6 +29,7 @@ A ban alone doesn't stick. Every rule below says what to write instead.
 | **Counted preamble** | "Three things to know:" "One thing to get right:" | Say the things. |
 | **Throat-clearing** | "Worth reading before you...", "It's worth noting", "Let's dive in", "Here's the thing" | Start with the first fact. |
 | **Chatbot residue** | "I hope this helps", "Great question!", "Certainly!", "As of my knowledge cutoff" | Delete. |
+| **Narrated testing** (customer work) | "we tried", "we ran", "we've tested", "we saw" | State the behaviour as fact. Say only what is verified, and say where verification stops. |
 | **Open loop on us** (customer work) | "We are checking with the team and will come back to you." | Say what can be done. Handle the rest offline. |
 | **Inflated significance** | "a pivotal moment", "marks a shift", "plays a vital role", "a testament to" | Say what actually happened. |
 | **Challenge and outlook closer** | "Despite these challenges, the future looks bright." | Delete. End on the fact. |
@@ -38,6 +39,7 @@ A ban alone doesn't stick. Every rule below says what to write instead.
 | Tell | Example | Write instead |
 |---|---|---|
 | **LLM vocabulary** | delve, leverage, robust, seamless, crucial, pivotal, comprehensive, landscape, transformative, unlock, empower, elevate, harness, tapestry, foster, underscore, showcase, enhance, garner, bolster, interplay, intricate, moreover, "only ever" | The plain word: use, strong, smooth, important, wide, help, improve. Or cut the sentence. |
+| **Invented anecdote** | "One team I worked with...", "I once...", "a friend of mine..." | Use only stories Jed gave you. Otherwise use a placeholder such as [a short story from the project]. |
 | **Copula avoidance** | "serves as", "stands as", "acts as a", "represents a" | "is" |
 | **Shallow -ing rider** | ", highlighting its importance", ", underscoring the need", ", showcasing", ", reflecting" | Cut it, or write a real sentence with the reason. |
 | **Vague authority** | "experts say", "studies show", "many believe", "industry reports" | Name the source or drop the claim. |

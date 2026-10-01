@@ -1,6 +1,6 @@
 {
   "skill": "jed-writing-style",
-  "about": "Scenarios for judging whether the skill changes Claude's output. Run each query twice, once with the skill and once without, then score both against expected_behavior. See evals/README.md.",
+  "about": "Scenarios for judging whether the skill changes Claude's output. Run each query twice, once with the skill and once without, then score both against expected_behavior. See evals/README.md. Results are in evals/RESULTS.md.",
   "evals": [
     {
       "id": "linkedin-post",
@@ -26,7 +26,8 @@
         "Does not leave an open loop such as 'we will confirm' or 'we are checking'",
         "Does not claim 50 frames was tested, and does not print a number it cannot back up",
         "Contains no exclamation mark and no dash used as punctuation",
-        "Runs ai_check.py with --register customer"
+        "Runs ai_check.py with --register customer",
+        "Invents nothing: no figure, anecdote, example, advice or claim beyond the facts given. A placeholder or a question is fine"
       ]
     },
     {
@@ -39,7 +40,8 @@
         "No box or bullet runs past two lines",
         "Slide order follows problem, then solution, then demo, and the demo slide is minimal",
         "Uses the 10,000 figure only as given and adds no invented statistics",
-        "Contains no filler headers such as 'The Goal' and no brochure closer"
+        "Contains no filler headers such as 'The Goal' and no brochure closer",
+        "Invents nothing: no figure, anecdote, example, advice or claim beyond the facts given. A placeholder or a question is fine"
       ]
     },
     {
@@ -47,12 +49,13 @@
       "query": "Write the speaker script for the problem slide of that talk. About 90 seconds.",
       "files": [],
       "expected_behavior": [
-        "States an estimated length and lands near 210 words (90 seconds at about 140 words a minute)",
+        "States an estimated length taken from the checker (ai_check.py --target-seconds 90), and the spoken length is within 15 percent of 90 seconds (about 180 to 240 words)",
         "Average sentence is about 10 words and none is longer than 25",
         "Uses contractions the way a person speaks",
         "Contains no brackets, slashes, 'e.g.', 'etc.' or ampersands inside the spoken lines",
         "Numbers are written the way they are said",
-        "Opens on a real question or moment and ends on the next step or a question"
+        "Opens on a real question or moment and ends on the next step or a question",
+        "Invents nothing: no figure, anecdote, example, advice or claim beyond the facts given. A placeholder or a question is fine"
       ]
     },
     {
@@ -60,7 +63,7 @@
       "query": "Polish this but keep my tone: 'hey team, quick update, the demo went well!! the customer liked the dashboard alot and asked for a follow up next week. thanks for all the hard work on this, really appreciate it'",
       "files": [],
       "expected_behavior": [
-        "Keeps Jed's wording and warmth. Changes only spelling, spacing and clear mistakes",
+        "Keeps Jed's wording, lowercase opener and warmth. Changes only spelling and clear mistakes",
         "Keeps the exclamation marks, since this is a message to teammates",
         "Does not turn it into a formal or corporate message",
         "Does not add new facts, praise or sign-off lines",
@@ -84,10 +87,11 @@
       "files": [],
       "expected_behavior": [
         "Runs ai_check.py or applies the same checks",
-        "Reports findings grouped by priority and names the specific words and patterns",
-        "Does not rewrite the passage unless asked",
+        "Findings are grouped P0, then P1, then P2, and name the specific words and patterns",
+        "Does not rewrite the passage unless asked, and the reply is the audit itself, not the original text",
         "The report is short and readable, not a dump of every match"
       ]
     }
-  ]
+  ],
+  "version": 2
 }

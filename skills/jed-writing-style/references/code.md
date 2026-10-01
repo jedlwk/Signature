@@ -31,6 +31,10 @@ Comment the why, never the what. Only on lines that would surprise the next read
 | `# use 5 here` | `# 5 trading days, one week of lag` |
 | `# fix bug` | `# api returns 200 with an empty body when the id is stale, so check length not status` |
 
+**The test:** delete the comment. If the line still tells you the same thing, the comment said
+*what*, so it should go or say *why*. `# log returns from close price` is a what. `# log returns so
+daily changes add up` is a why.
+
 **Jed's personal comment style** (CS7646), for personal and course code with no house style:
 short, lowercase, abbreviations fine ("corr", "feat", "cols"), like explaining to a classmate.
 Example: `# corr on log returns, raw prices trend together and inflate it`. In shared or team repos, match

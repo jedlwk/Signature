@@ -16,8 +16,8 @@ examples than with descriptions.
 
 - Read one sample that matches the material before drafting. Match its rhythm and warmth, not its
   exact words.
-- Don't copy phrases from a sample into new work. Borrowing "had the privilege of" every time would
-  become a tic of its own.
+- Don't copy phrases from a sample into new work. In testing, a smaller model copied "had the
+  privilege of" straight into a new post. Borrowing it every time would become a tic of its own.
 - The Medium post (2021) uses em dashes. Jed no longer wants them in anything Claude writes. Read
   the rhythm, skip the dashes.
 

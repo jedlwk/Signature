@@ -1,0 +1,23 @@
+name: release
+
+# Push a tag like v2.1.0 and this attaches a zip of the skill, ready to upload to Claude.ai.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Zip the skill
+        run: |
+          cd skills
+          zip -r ../jed-writing-style-skill.zip jed-writing-style -x "*/__pycache__/*"
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" jed-writing-style-skill.zip --generate-notes --title "$GITHUB_REF_NAME"
