@@ -1,0 +1,7 @@
+{
+  "name": "signature",
+  "owner": { "name": "jedlwk" },
+  "plugins": [
+    { "name": "signature", "source": "./", "description": "Jed's writing voice, anti-AI rules and an AI-tell checker." }
+  ]
+}
