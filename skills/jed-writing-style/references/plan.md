@@ -12,6 +12,23 @@ Stage one writes a plan and changes nothing. Stage two applies only what Jed app
 - Stage two: apply
 - Checklist
 
+## What it covers
+
+Every kind of writing in a project that can be edited safely.
+
+| File type | What is read and edited |
+|---|---|
+| `.md` `.markdown` `.txt` `.rst` `.adoc` | The whole text |
+| `.docx` | Body, headers, footers, footnotes and endnotes. Only the text changes |
+| `.pptx` | Every slide in display order, and the speaker notes. Only the text changes |
+| `.html` `.htm` | Visible text. Never tags, attributes, scripts or styles |
+| `.ipynb` | Markdown cells |
+| Source files, with `--code` | Comments and docstrings |
+| Source files, with `--strings` | Comments, and user-facing strings such as error messages and UI copy |
+
+Not editable here, and listed in the plan with the reason: `.pdf` (edit the file it came from), `.xlsx`,
+and old `.doc` and `.ppt` files. A slide that is a picture has no editable text, and the plan says so.
+
 ## The rules
 
 - **Stage one is read-only.** The only file you may create is `STYLE_PLAN.md`. Never edit, move or
@@ -25,7 +42,12 @@ Stage one writes a plan and changes nothing. Stage two applies only what Jed app
 - **Change sentences, not meaning.** Never touch quotes, code blocks, data tables, names, numbers,
   legal or licence text, or text Jed didn't write.
 - **Plan the pattern, not every instance.** A file with 200 dashes gets one rule with a count and
-  three examples, not 200 rows.
+  three examples, not 200 rows. Write it with `Where: all` and a short Before such as "serves as".
+- **Every change has a Where.** In `.docx`, `.pptx`, `.html` and `.ipynb` files it is the unit number the
+  scanner gave (`unit` in the JSON). In text and code files it is the line. The editor uses it to
+  pick the right match when the same words appear twice.
+- **In Word and PowerPoint, one change is one paragraph.** The Before text must sit inside a single
+  paragraph, copied exactly as `scripts/apply_edits.py --units <file>` prints it. Split anything longer.
 
 ## Stage one: write the plan
 
@@ -36,8 +58,9 @@ Stage one writes a plan and changes nothing. Stage two applies only what Jed app
    ```
 
    It respects `.gitignore`, skips agent files, sample data, transcripts, archives and logs, and
-   ranks files worst first. Add `--code` only if Jed asked for code comments. The options are in
-   `docs/restyle.md` of the Signature repo.
+   ranks files worst first. Add `--code` if Jed asked for code comments, and `--strings` for
+   user-facing text inside code. Each finding carries a `where` label and a `unit` number. The options
+   are in `docs/restyle.md` of the Signature repo.
 2. **Check the scope.** Read the folder table and the skipped list. If a folder looks like someone
    else's text (course material, a vendor's docs, test data), leave it out and say so in the plan. If
    more than about 60 files were scanned, show Jed the folder table and ask which folders to include
@@ -79,13 +102,20 @@ Made on <date> with jed-writing-style <version>. Nothing has been changed yet.
 
 ### 1. README.md (doc, score 13.1)
 - [ ] **1.1** line 12, P0 dash
+  - Where: line 12
   - Before: <exact text>
   - After: <exact text>
   - Why: no dashes as punctuation. A comma continues the thought.
 - [ ] **1.2** pattern, 14 places, P1 "serves as"
-  - Before: "serves as the entry point" (and 13 more)
-  - After: "is the entry point"
+  - Where: all
+  - Before: serves as
+  - After: is
   - Why: plain verbs.
+- [ ] **1.3** slide 3, P1 banned word
+  - Where: unit 41 (Slide 3, paragraph 2)
+  - Before: <exact text from one paragraph>
+  - After: <exact text>
+  - Why: plain words.
 
 ## Not changing
 - <quotes, code, data, third-party text, anything skipped on purpose>
@@ -116,18 +146,41 @@ Run this only when Jed has approved something.
 2. **Make it safe to undo.**
    - In a git repo, run `git status`. If a file you will change has uncommitted work, stop and tell Jed.
      Don't stash or commit for them.
-   - Outside git, copy the files you will change into `.signature-backup/<timestamp>/` first.
-3. **Apply each approved change** as an exact replacement of the Before text. If the Before text no
-   longer matches, skip it and say so. Never guess a nearby match.
-4. **Pattern items** apply to every instance the plan listed, and only those.
-5. **Word and PowerPoint files.** Use the docx or pptx skill if one is available. If not, give Jed the
-   paste-ready text for each change and don't pretend it was applied.
-6. **Check again.** Run `scripts/ai_check.py` on each changed file with its register. Fix anything the
-   edit introduced. One more pass at most.
-7. **Update the plan.** Mark applied items. Add the date, and a before and after score for every file
-   you changed.
+   - Outside git, you will pass `--backup .signature-backup/<timestamp>` in step 4, so the originals are
+     kept.
+3. **Write the approved items to `edits.json`** in `.signature-backup/<timestamp>/`, so it stays as a
+   record of exactly what was applied and doesn't litter the project. One entry per item, in the plan's
+   own words. Don't rephrase the Before or After text. A pattern item gets `"all": true`.
+
+   ```json
+   {"edits": [{"id": "1.1", "file": "README.md", "before": "...", "after": "...", "where": 12}]}
+   ```
+4. **Run the editor.** It does every edit, for every supported file type, and you never edit files by
+   hand. Dry run first, then for real.
+
+   ```bash
+   python3 scripts/apply_edits.py .signature-backup/<timestamp>/edits.json --dry-run
+   python3 scripts/apply_edits.py .signature-backup/<timestamp>/edits.json
+   ```
+
+   Outside git, add `--backup .signature-backup/<timestamp>` to the real run. In a git repo leave it
+   off. Git is the undo there, and without `--backup` the editor skips any file that has uncommitted
+   changes.
+
+   Items marked NEEDS FACT keep a `[placeholder]` in their After text, and the editor skips them
+   until Jed has filled it in. Don't remove the brackets yourself to get around that.
+
+   It makes exact replacements only. Word and PowerPoint files change only the text, so formatting and
+   everything else stays as it was. A change whose Before text isn't found, or is found more than once
+   without a Where, is skipped and reported. Never retry a skipped change with looser text. Tell Jed.
+5. **Check again.** Run `scripts/ai_check.py` on each changed file with its register. Fix anything the
+   edit introduced, with another edits file. One more pass at most.
+7. **Update the plan.** Replace the line "Nothing has been changed yet" with what was applied and what
+   wasn't. Mark applied items, and mark skipped ones with the reason the editor gave. Add the date, and
+   a before and after score for every file you changed.
 8. **Report.** Files changed, changes applied, changes skipped and why, and the new scores. Show
-   `git diff --stat` if it's a repo. Don't commit unless Jed asks.
+   `git diff --stat` if it's a repo. Don't commit unless Jed asks. Say that `STYLE_PLAN.md` and
+   `.signature-backup/` are working files Jed can delete or add to `.gitignore`.
 
 ## Checklist
 
@@ -136,4 +189,4 @@ Run this only when Jed has approved something.
 - [ ] Every change has an exact before, an after and a reason
 - [ ] Nothing in the plan needs a fact the file doesn't contain, except items marked NEEDS FACT
 - [ ] The reply ends at the plan. No edits before approval
-- [ ] Apply: safe to undo, exact matches only, checker run after
+- [ ] Apply: safe to undo, done with `apply_edits.py`, skipped items reported, checker run after

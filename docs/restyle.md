@@ -5,10 +5,12 @@ between them: a plan that changes nothing, then an apply step that does only wha
 
 ## Contents
 - The flow
-- What gets scanned
+- What it covers
 - Choosing what to leave out
 - The scanner
+- The editor
 - Approving and applying
+- Limits
 - Undoing
 
 ## The flow
@@ -31,21 +33,36 @@ cp docs/personal-commands/*.md ~/.claude/commands/
 They expect the skill at `~/.claude/skills/jed-writing-style`.
 
 Ask for specific files by naming them: `/signature:plan docs/ README.md`. Add `--code` to include comments
-and docstrings in source files. Without it, code is left alone.
+and docstrings in source files, or `--strings` to include user-facing text inside code as well.
 
-## What gets scanned
+## What it covers
 
-Prose files: `.md`, `.markdown`, `.txt`, `.rst`, `.docx` and `.pptx`. Inside a git repo the scanner uses
-`git ls-files`, so `.gitignore` is respected. Elsewhere it walks the folder.
+Every kind of writing in a project that can be edited safely. It needs no other skill or library.
+
+| File type | What is read and edited |
+|---|---|
+| `.md` `.markdown` `.txt` `.rst` `.adoc` | The whole text |
+| `.docx` | Body, headers, footers, footnotes and endnotes. Only the text changes |
+| `.pptx` | Every slide in display order, and the speaker notes. Only the text changes |
+| `.html` `.htm` | Visible text. Never tags, attributes, scripts or styles |
+| `.ipynb` | Markdown cells |
+| Source files, with `--code` | Comments and docstrings |
+| Source files, with `--strings` | Comments, plus quoted strings that read like sentences, such as error messages and UI copy |
+
+Listed in the plan with the reason, but not edited: `.pdf` (edit the file it was made from), `.xlsx`, and
+the old `.doc` and `.ppt` formats (save as `.docx` or `.pptx` first). A slide that is a picture has no
+editable text, and the plan says how many there are.
 
 It skips, and says why:
 
-- Agent and tool files: `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `MEMORY.md`, licences and lockfiles.
+- Agent and tool files: `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `MEMORY.md`, `STYLE_PLAN.md`, licences and lockfiles.
 - Folders like `node_modules`, virtualenvs, build output and anything hidden.
 - Text that probably isn't Jed's: sample data, fixtures, transcripts, handouts, readings, syllabi,
   archives and backups. Add `--all` to include them.
 - Files over 20,000 words, which are usually logs or data dumps.
 - Files that say they were generated.
+
+Inside a git repo the scanner uses `git ls-files`, so `.gitignore` is respected.
 
 ## Choosing what to leave out
 
@@ -74,6 +91,7 @@ python3 skills/jed-writing-style/scripts/plan_scan.py
 |---|---|
 | `paths` | Scan only these files or folders. |
 | `--code` | Also read comments and docstrings in source files. |
+| `--strings` | Also read user-facing strings in source files. Implies `--code`. |
 | `--exclude GLOB` | Skip matching paths. Repeatable. |
 | `--all` | Don't skip files that look like samples or third-party text. |
 | `--top N` | Rows in the table. Default 25. |
@@ -81,19 +99,82 @@ python3 skills/jed-writing-style/scripts/plan_scan.py
 | `--json` | The full result, which is what the plan is written from. |
 
 It prints a folder table first, so you can spot a folder that isn't yours, then the worst files with
-their scores. It only reads. It never changes a file.
+their scores. Every finding carries a `where` label (such as "Slide 3, paragraph 2") and a `unit`
+number the editor can use. It only reads. It never changes a file.
+
+## The editor
+
+`apply_edits.py` makes the approved changes. Claude writes the approved items to an `edits.json` file and
+runs it, so no file is ever edited by hand.
+
+```bash
+python3 skills/jed-writing-style/scripts/apply_edits.py edits.json --dry-run
+```
+
+```bash
+python3 skills/jed-writing-style/scripts/apply_edits.py edits.json
+```
+
+| Option | What it does |
+|---|---|
+| `--dry-run` | Report what would change. Write nothing. |
+| `--backup DIR` | Copy each original into DIR before changing it. |
+| `--allow-dirty` | Edit files that have uncommitted changes in git. |
+| `--root DIR` | The project folder. Edits may not leave it. Default: the current folder. |
+| `--units FILE` | List a file's units with their numbers and labels, then exit. |
+| `--json` | Print the report as JSON. |
+
+Each edit has an `id`, a `file`, the `before` text and the `after` text. Two optional fields narrow it:
+`where` (a unit number, a line, or a label such as "Slide 3") and `all` (replace every match).
+
+```json
+{"edits": [
+  {"id": "1.1", "file": "README.md", "before": "In order to start", "after": "To start"},
+  {"id": "2.3", "file": "deck.pptx", "before": "seamless", "after": "smooth", "where": "Slide 3"},
+  {"id": "3.1", "file": "docs/old.md", "before": "serves as", "after": "is", "all": true}
+]}
+```
+
+What it guarantees:
+
+- **Exact replacements only.** The Before text must be found exactly. A change that isn't found, or is found
+  more than once with no `where` or `all`, is skipped and reported. It never guesses a nearby match.
+- **Word and PowerPoint keep everything but the text.** The editor changes only the text inside the
+  document's XML. It is never re-saved by a library, so fonts, layout, images, comments, theme and
+  compression all stay as they were. New text goes into the first run it touches, so it takes that run's
+  formatting.
+- **A Word or PowerPoint file is written only if it still parses.** Each changed part is checked as XML,
+  the new file is read back, and every After text must be found in it. Otherwise the original stays.
+- **Code stays code.** In a source file, a change must sit inside a comment, a docstring or (with
+  `--strings`) a sentence-like string. A Python file must still compile afterwards.
+- **Gaps stay gaps.** An After text that still has a `[bracketed placeholder]` (a NEEDS FACT item) is skipped
+  until someone fills it in, so a placeholder is never written into a deck or a document.
+- **Git can always undo it.** In a git repo, a file with uncommitted changes, or one git doesn't know yet,
+  is skipped. Pass `--backup DIR` to keep a copy and edit it anyway, or `--allow-dirty`.
+- **A skipped change never stops the others.** Each ends as `applied`, `not_found`, `ambiguous`,
+  `unsupported` or `error`, with the reason.
 
 ## Approving and applying
 
 You approve by ticking boxes in `STYLE_PLAN.md`, or by telling Claude: "apply all", "apply file 1",
 "apply 1.1 to 1.4", "apply all P0". Nothing is applied that you didn't approve, and "all" is never assumed.
 
-Each change is an exact replacement of the Before text. If a file moved on since the plan was written
-and the text no longer matches, that change is skipped and reported. Word and PowerPoint files need the
-docx or pptx skill to be edited. If it isn't available, you get paste-ready text instead.
+## Limits
+
+- **Tested without Word or PowerPoint.** Edited files are checked byte by byte, parsed as XML, and opened with
+  python-docx and python-pptx, but not opened in Word or PowerPoint themselves. Open a changed file once
+  and look before you rely on it.
+- **No tracked changes.** Edits are made directly. The plan is the review, and git or the backup is the undo.
+- **One paragraph at a time.** In Word and PowerPoint, a change can't span two paragraphs, a tab or a line
+  break. Longer edits are split in the plan.
+- **Text in charts, SmartArt, images and some text boxes can't be reached.** If a deck is mostly pictures,
+  the plan says so.
+- **Notebooks are edited only if saving them wouldn't reformat them.** Otherwise they are skipped with that
+  reason.
+- **HTML text with entities** (such as `&amp;`) must be edited as it appears in the source.
 
 ## Undoing
 
-In a git repo, apply refuses to touch a file with uncommitted work, so `git diff` shows exactly what
+In a git repo, the editor refuses to touch a file with uncommitted work, so `git diff` shows exactly what
 changed and `git checkout` undoes it. Outside git, the originals are copied to `.signature-backup/`
 before anything is edited.

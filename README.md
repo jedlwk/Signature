@@ -73,8 +73,11 @@ You can also call it on purpose:
 | `/signature:apply` | Applies only the changes I approved in that plan. |
 
 **Restyle a whole project.** Run `/signature:plan` in any project. It writes `STYLE_PLAN.md` and stops.
-I tick the changes I want, then run `/signature:apply`. Without the plugin, the personal commands in
-`docs/personal-commands/` do the same as `/restyle` and `/restyle-apply`. See [docs/restyle.md](docs/restyle.md).
+I tick the changes I want, then run `/signature:apply`. It reads and edits Word, PowerPoint, HTML,
+notebooks, Markdown and text files, plus code comments and user-facing strings on request. Word and
+PowerPoint keep their formatting, because only the text changes. It needs no other skill. Without the
+plugin, the personal commands in `docs/personal-commands/` do the same as `/restyle` and `/restyle-apply`.
+See [docs/restyle.md](docs/restyle.md).
 
 `/signature:learn` keeps a private log of my corrections in `~/.claude/signature/` on my machine. It is
 never committed, and anything confidential is replaced with a placeholder first.

@@ -1,5 +1,29 @@
 # Changelog
 
+## 2.3.0
+
+The restyle can now edit everything, not only plan it.
+
+- New editor, `scripts/apply_edits.py`. It makes the approved changes in Markdown, text, Word, PowerPoint,
+  HTML, notebooks and source files, with no library and no other skill.
+- Word and PowerPoint files are edited by changing only the text inside the XML. Fonts, layout, images,
+  comments and compression stay byte for byte as they were. Checked on real decks and documents, and
+  opened with python-docx and python-pptx afterwards.
+- Exact replacements only. A change that isn't found, or is found twice with no `where`, is skipped and
+  reported, never guessed. A Word or PowerPoint file is written only if it still parses and every After
+  text reads back.
+- Git safety is enforced by the script, not by instructions. A file with uncommitted changes is skipped
+  unless `--backup` or `--allow-dirty` is given.
+- Code edits must sit inside a comment, a docstring or a sentence-like string, and a Python file must
+  still compile. A notebook is edited only if saving it wouldn't reformat it.
+- New format layer, `scripts/formats.py`. Slides come in display order with their speaker notes. Every
+  unit has a number and a label such as "Slide 3, paragraph 2".
+- The scanner reads `.html`, `.ipynb` and `.adoc`, gives each finding a `where` and a `unit`, notes
+  slides that are pictures, lists formats it can't edit (such as `.pdf`) with the reason, and takes
+  `--strings` to include user-facing text inside code.
+- `docs/restyle.md` covers the formats, the editor, its guarantees and its limits.
+- 48 new tests, all standard library, so CI needs no Office libraries.
+
 ## 2.2.0
 
 Plan first, then change. A new way to bring a whole project into Jed's style without losing control.

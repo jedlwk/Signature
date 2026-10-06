@@ -1,6 +1,6 @@
 {
   "name": "signature",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "Jed's writing voice and anti-AI rules for code, documents, slides, scripts and posts, with a checker that flags AI tells.",
   "author": {
     "name": "jedlwk"

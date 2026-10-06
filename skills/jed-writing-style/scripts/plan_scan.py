@@ -7,6 +7,7 @@ Usage:
     python3 plan_scan.py                       scan the current folder
     python3 plan_scan.py docs/ README.md       scan only these paths
     python3 plan_scan.py --code                also read comments and docstrings in source files
+    python3 plan_scan.py --strings             also read user-facing strings in source files (implies --code)
     python3 plan_scan.py --json                full result as JSON, for writing the plan
     python3 plan_scan.py --exclude "drafts/*" --exclude legacy   skip paths (also read from .signatureignore)
     python3 plan_scan.py --all                 don't skip files that look like samples or third-party text
@@ -25,15 +26,17 @@ import os
 import re
 import subprocess
 import sys
+import zipfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import ai_check  # noqa: E402
+import formats  # noqa: E402
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
-# Prose Jed writes. These are scanned by default.
-PROSE_EXT = {".md", ".markdown", ".txt", ".rst", ".docx", ".pptx"}
+# Prose Jed writes. These are scanned by default, and apply_edits.py can edit every one of them.
+PROSE_EXT = {".md", ".markdown", ".txt", ".rst", ".adoc", ".docx", ".pptx", ".html", ".htm", ".ipynb"}
 # Files that exist for agents or tools, not readers. Never scanned.
 # STYLE_PLAN.md quotes the text it plans to change, so scanning it would always rank it worst.
 SKIP_NAMES = {"claude.md", "agents.md", "gemini.md", "memory.md", "style_plan.md", "license", "licence", "notice",
@@ -139,6 +142,8 @@ def classify(root, rel, include_code, patterns=(), keep_all=False):
         return False, "agent or tool file"
     suffix = rel.suffix.lower()
     is_code = suffix in ai_check.CODE_EXT
+    if suffix in formats.UNEDITABLE:
+        return False, "can't be edited here, %s" % formats.UNEDITABLE[suffix]
     if suffix not in PROSE_EXT and not (include_code and is_code):
         return False, "code (use --code)" if is_code else "not prose"
     try:
@@ -152,7 +157,31 @@ def classify(root, rel, include_code, patterns=(), keep_all=False):
     return True, ""
 
 
-def scan(root, paths=None, include_code=False, max_findings=20, exclude=None, keep_all=False):
+def where_for_line(units, line):
+    """The unit (paragraph, slide text, cell) that holds this line of the analysed text."""
+    seen = 0
+    for u in units:
+        seen += u.text.count("\n") + 1
+        if line <= seen:
+            return u
+    return None
+
+
+def image_only_note(path):
+    """For a deck, say how many slides have no editable text because they are pictures."""
+    try:
+        with zipfile.ZipFile(path) as z:
+            slides = [(n, prefix) for n, prefix, label in formats.pptx_parts(z) if label.startswith("Slide")]
+            empty = sum(1 for n, prefix in slides
+                        if not any(p.text.strip() for p in formats.parse_paragraphs(z.read(n).decode("utf8"), prefix)))
+    except (OSError, zipfile.BadZipFile, KeyError, UnicodeDecodeError):
+        return None
+    if slides and empty:
+        return "Slides with no editable text (they are pictures): %d of %d. Change the source of those slides." % (empty, len(slides))
+    return None
+
+
+def scan(root, paths=None, include_code=False, max_findings=20, exclude=None, keep_all=False, strings=False):
     root = Path(root).resolve()
     patterns = load_ignore(root, exclude)
     scanned, skipped = [], []
@@ -168,23 +197,38 @@ def scan(root, paths=None, include_code=False, max_findings=20, exclude=None, ke
         except Exception as e:  # a bad docx should not stop the scan
             skipped.append({"path": str(rel), "reason": "could not read: %s" % e})
             continue
-        if suffix in (".md", ".markdown", ".txt", ".rst") and GENERATED.search(raw[:400]):
+        if suffix in (".md", ".markdown", ".txt", ".rst", ".adoc", ".html", ".htm") and GENERATED.search(raw[:400]):
             skipped.append({"path": str(rel), "reason": "looks generated"})
             continue
         register = "code" if suffix in ai_check.CODE_EXT else infer_register(str(rel), suffix)
         if len(raw.split()) > MAX_WORDS:
             skipped.append({"path": str(rel), "reason": "over %d words, probably a log or data dump" % MAX_WORDS})
             continue
-        result = ai_check.analyse(raw, register, suffix)
+        result = ai_check.analyse(raw, register, suffix, strings=strings)
         counts = {"P0": 0, "P1": 0, "P2": 0}
         for f in result["findings"]:
             counts[f["tier"]] += 1
-        scanned.append({
+        units = formats.read_units(str(root / rel)) if suffix in formats.OFFICE_EXT or suffix in (".html", ".htm", ".ipynb") else None
+        findings = []
+        for f in result["findings"]:
+            if f["tier"] == "P2":
+                continue
+            item = {k: f[k] for k in ("tier", "label", "line", "snippet", "advice")}
+            unit = where_for_line(units, f["line"]) if units and f["line"] else None
+            # "where" is what an edit can use to pin down a match: a unit number, or a line in a text file.
+            item["where"] = unit.label if unit else ("line %d" % f["line"] if f["line"] else "")
+            item["unit"] = unit.number if unit else f["line"]
+            findings.append(item)
+        entry = {
             "path": str(rel), "register": register, "words": result["words"], "score": result["score"],
             "verdict": result["verdict"], "counts": counts, "rhythm": result["rhythm"],
-            "findings": [{k: f[k] for k in ("tier", "label", "line", "snippet", "advice")}
-                         for f in result["findings"] if f["tier"] != "P2"][:max_findings],
-        })
+            "findings": findings[:max_findings], "notes": [],
+        }
+        if suffix == ".pptx":
+            note = image_only_note(root / rel)
+            if note:
+                entry["notes"].append(note)
+        scanned.append(entry)
     # Worst first: any P0 matters most, then P1, then the overall score.
     scanned.sort(key=lambda f: (-f["counts"]["P0"], -f["counts"]["P1"], -f["score"], f["path"]))
     return {"root": str(root), "scanned": scanned, "skipped": skipped, "include_code": include_code,
@@ -221,6 +265,9 @@ def markdown(result, top=25):
         out.append("| and %d more files | | | | | | | |" % (len(rows) - top))
     clean = sum(1 for f in rows if f["verdict"] == "clean")
     out += ["", "%d of %d files are already clean." % (clean, len(rows))]
+    notes = [(f["path"], n) for f in rows for n in f["notes"]]
+    if notes:
+        out += ["", "Notes:"] + ["- %s: %s" % (path, note) for path, note in notes[:10]]
     if result["skipped"]:
         out += ["", "Skipped:"]
         out += ["- %s (%s)" % (s["path"], s["reason"]) for s in result["skipped"][:15]]
@@ -235,6 +282,7 @@ def main(argv=None):
     ap.add_argument("--code", action="store_true", help="also read comments and docstrings in source files")
     ap.add_argument("--json", action="store_true", help="print the full result as JSON")
     ap.add_argument("--exclude", action="append", metavar="GLOB", help="skip paths matching this pattern. Repeatable")
+    ap.add_argument("--strings", action="store_true", help="also read user-facing strings in source files (implies --code)")
     ap.add_argument("--all", action="store_true", help="include files that look like samples or third-party text")
     ap.add_argument("--top", type=int, default=25, metavar="N", help="rows shown in the table (default 25)")
     ap.add_argument("--max-findings", type=int, default=20, metavar="N", help="findings kept per file (default 20)")
@@ -246,7 +294,7 @@ def main(argv=None):
         if not (root / p).exists():
             print("plan_scan: no such path: %s" % p, file=sys.stderr)
             return 2
-    result = scan(root, args.paths, args.code, args.max_findings, args.exclude, args.all)
+    result = scan(root, args.paths, args.code or args.strings, args.max_findings, args.exclude, args.all, args.strings)
     if not result["scanned"]:
         print("plan_scan: nothing to scan here. Prose files are .md, .txt, .rst, .docx and .pptx. Add --code for comments.", file=sys.stderr)
         return 2

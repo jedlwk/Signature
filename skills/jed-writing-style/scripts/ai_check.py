@@ -32,7 +32,10 @@ import zipfile
 from collections import namedtuple
 from pathlib import Path
 
-__version__ = "2.1.0"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import formats  # noqa: E402
+
+__version__ = "2.2.0"
 
 # ---------------------------------------------------------------------------
 # Thresholds. Each value has a reason so nobody has to guess what it means.
@@ -249,27 +252,14 @@ BUILTIN = {
 # ---------------------------------------------------------------------------
 
 def read_text(path):
-    """Return the text of a file, docx, pptx or stdin. Raises OSError on a bad path."""
+    """Return the text of a file, docx, pptx, html, notebook or stdin. Raises OSError on a bad path."""
     if path == "-":
         return sys.stdin.read()
     p = Path(path)
     suffix = p.suffix.lower()
-    if suffix not in (".docx", ".pptx"):
-        return p.read_text(encoding="utf8", errors="replace")
-    with zipfile.ZipFile(p) as z:
-        if suffix == ".docx":
-            names, para, text_tag = ["word/document.xml"], r"</w:p>", r"<w:t[^>]*>(.*?)</w:t>"
-        else:
-            names = sorted(n for n in z.namelist() if re.match(r"ppt/(slides|notesSlides)/\w+\d+\.xml$", n))
-            para, text_tag = r"</a:p>", r"<a:t>(.*?)</a:t>"
-        lines = []
-        for name in names:
-            xml = z.read(name).decode("utf8")
-            for chunk in re.split(para, xml):
-                line = "".join(re.findall(text_tag, chunk, re.S))
-                if line.strip():
-                    lines.append(line)
-        return "\n".join(lines)
+    if suffix in formats.OFFICE_EXT or suffix in (".html", ".htm", ".ipynb"):
+        return formats.units_text(formats.read_units(str(p)))
+    return p.read_text(encoding="utf8", errors="replace")
 
 
 def blank(match):
@@ -277,8 +267,29 @@ def blank(match):
     return "\n" * match.group(0).count("\n")
 
 
-def extract_comments(src, suffix):
-    """Keep only comments and docstrings. Everything else becomes spaces, newlines are kept."""
+# A quoted string counts as writing, not code, when it reads like a sentence: long enough, several words,
+# and not a path, link, query, pattern or markup.
+STRING_RE = re.compile(r"""(?<![\w"'])(?P<q>["'])(?P<body>(?:\\.|(?!(?P=q))[^\\\n])+)(?P=q)""")
+NOT_PROSE = re.compile(r"(://|^[<#./\\$@{\[]|\b(select|insert|update|delete)\b.*\b(from|into|set|where)\b|\\[dwsb]|[;{}]\s|=>|\(\)|\.py\b|\.js\b)", re.I)
+MIN_STRING_CHARS = 25
+MIN_STRING_WORDS = 4
+
+
+def prose_string_spans(src):
+    """Spans of quoted strings that read like sentences. Single-line strings only."""
+    spans = []
+    for m in STRING_RE.finditer(src):
+        body = m.group("body")
+        if len(body) >= MIN_STRING_CHARS and len(body.split()) >= MIN_STRING_WORDS and not NOT_PROSE.search(body):
+            spans.append(m.span("body"))
+    return spans
+
+
+def extract_comments(src, suffix, strings=False):
+    """Keep only comments and docstrings, and with strings=True the prose strings too.
+
+    Everything else becomes spaces. Newlines are kept, so line numbers stay right.
+    """
     spans = []
     if suffix == ".py":
         spans += [m.span(2) for m in re.finditer(r'("""|\'\'\')(.*?)\1', src, re.S)]
@@ -290,6 +301,8 @@ def extract_comments(src, suffix):
     else:
         line_marker = r"(?<![:\w/])//\s?(.*)$"
     spans += [m.span(1) for m in re.finditer(line_marker, src, re.M)]
+    if strings:
+        spans += prose_string_spans(src)
     keep = [" " if c != "\n" else "\n" for c in src]
     for start, end in spans:
         keep[start:end] = list(src[start:end])
@@ -453,12 +466,12 @@ def effective_limits(reg, register, calibration):
 # Analysis (pure function, so tests can call it directly)
 # ---------------------------------------------------------------------------
 
-def analyse(raw, register="general", suffix="", facts=None, target_seconds=None, calibration=None):
+def analyse(raw, register="general", suffix="", facts=None, target_seconds=None, calibration=None, strings=False):
     reg = REGISTERS[register]
     limits = effective_limits(reg, register, calibration)
     is_code = suffix in CODE_EXT
     if is_code:
-        raw = extract_comments(raw, suffix)
+        raw = extract_comments(raw, suffix, strings)
         text = IGNORE_LINE_RE.sub("", IGNORE_RE.sub(blank, raw))
     else:
         text = strip_markup(raw)
@@ -504,7 +517,7 @@ def analyse(raw, register="general", suffix="", facts=None, target_seconds=None,
     if reg.semicolons:
         for m in re.finditer(r";", text):
             add("semicolon", line_of(text, m.start()), snippet(text, m.start(), m.end(), 25))
-    if suffix not in (".docx", ".pptx"):
+    if suffix not in (".docx", ".pptx", ".html", ".htm", ".ipynb"):
         n_curly = len(CURLY.findall(text))
         if n_curly:
             add("curly quotes", 0, "%d found" % n_curly)
@@ -758,6 +771,7 @@ def main(argv=None):
     ap.add_argument("--baseline", metavar="DIR", help="measure a folder of your own writing and suggest thresholds")
     ap.add_argument("--save", action="store_true", help="with --baseline, save the thresholds to %s" % CALIBRATION_PATH)
     ap.add_argument("--calibration", metavar="FILE", help="thresholds to use instead of the saved ones")
+    ap.add_argument("--strings", action="store_true", help="for source files, also read user-facing strings, not only comments")
     ap.add_argument("--no-calibration", action="store_true", help="ignore any saved thresholds")
     ap.add_argument("--version", action="version", version="ai_check " + __version__)
     args = ap.parse_args(argv)
@@ -791,7 +805,7 @@ def main(argv=None):
 
     try:
         raw = read_text(args.file)
-    except (OSError, zipfile.BadZipFile) as e:
+    except (OSError, ValueError, zipfile.BadZipFile) as e:
         print("ai_check: cannot read %s: %s" % (args.file, e), file=sys.stderr)
         return 2
 
@@ -823,7 +837,8 @@ def main(argv=None):
     calibration = None
     if not args.no_calibration and not os.environ.get("SIGNATURE_NO_CALIBRATION"):
         calibration = load_calibration(args.calibration or CALIBRATION_PATH)
-    result = analyse(raw, register, suffix, facts=facts or None, target_seconds=args.target_seconds, calibration=calibration)
+    result = analyse(raw, register, suffix, facts=facts or None, target_seconds=args.target_seconds, calibration=calibration,
+                     strings=args.strings)
 
     if args.json:
         print(json.dumps(result, indent=2))
