@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.2.0
+
+Plan first, then change. A new way to bring a whole project into Jed's style without losing control.
+
+- `/signature:plan` scans the project and writes `STYLE_PLAN.md`: every proposed change with the exact
+  before, the after and the rule behind it. It changes nothing and waits for approval.
+- `/signature:apply` applies only the changes Jed approved, checks them, and updates the plan. It refuses
+  to touch files with uncommitted work in git, and backs files up when there is no git.
+- New scanner, `scripts/plan_scan.py`. It respects `.gitignore`, skips agent files, sample data,
+  transcripts, archives and logs, and ranks files worst first. `.signatureignore` and `--exclude`
+  leave things out.
+- New Plan mode in `SKILL.md` and a `references/plan.md` with the rules, the plan template and the
+  apply steps. Local rules in a project's CLAUDE.md win.
+- Personal commands `/restyle` and `/restyle-apply` for use without the plugin, in
+  `docs/personal-commands/`.
+- New docs: `docs/restyle.md` and `docs/develop.md`. The README keeps only a short Develop section.
+- 23 new tests for the scanner and the wiring.
+
 ## 2.1.0
 
 Driven by the first real eval run (7 scenarios, with and without the skill, on Haiku, Sonnet and Opus).

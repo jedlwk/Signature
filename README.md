@@ -69,11 +69,17 @@ You can also call it on purpose:
 | `/signature:check <file or text>` | Runs the checker and reports findings, grouped by priority. No rewrite. |
 | `/signature:polish <file or text>` | Polishes with minimal changes, then checks. |
 | `/signature:learn` | Compares what Claude wrote with what I changed it to, and proposes a rule or an example. Asks before writing. |
+| `/signature:plan` | Scans the project and writes `STYLE_PLAN.md`, a plan to bring it into my style. Changes nothing. |
+| `/signature:apply` | Applies only the changes I approved in that plan. |
+
+**Restyle a whole project.** Run `/signature:plan` in any project. It writes `STYLE_PLAN.md` and stops.
+I tick the changes I want, then run `/signature:apply`. Without the plugin, the personal commands in
+`docs/personal-commands/` do the same as `/restyle` and `/restyle-apply`. See [docs/restyle.md](docs/restyle.md).
 
 `/signature:learn` keeps a private log of my corrections in `~/.claude/signature/` on my machine. It is
 never committed, and anything confidential is replaced with a placeholder first.
 
-Claude picks one of five modes from what you say:
+Claude picks one of six modes from what you say:
 
 | You say | Mode | What happens |
 |---|---|---|
@@ -82,6 +88,7 @@ Claude picks one of five modes from what you say:
 | "rewrite", "too AI" | Rewrite | Rebuilt from what the text is trying to say |
 | "check", "AI score" | Audit | Findings only, no rewrite |
 | names, taglines | Options | Three to five real options and a pick |
+| "restyle this project" | Plan | Writes `STYLE_PLAN.md`, then waits for approval |
 
 A folder's own CLAUDE.md, a rubric, a template or a repo convention beats this guide where they differ.
 
@@ -125,15 +132,14 @@ It is a style linter, not an AI detector like GPTZero. A clean score means nothi
 
 ## How well it works
 
-I ran seven writing tasks with and without the skill, on Haiku, Sonnet and Opus. Then I fixed what
-failed and ran them again. On a 41 line rubric, plain Sonnet met 27 lines. With the skill, Sonnet went
-from 36 to 40, Haiku from 28 to 36 and Opus from 38 to 41. The biggest wins were not inventing facts,
-hitting a script's length, and keeping my tone when polishing. The skill's description routed 19 of 19
-test requests correctly.
+I ran seven writing tasks with and without the skill, on Haiku, Sonnet and Opus, fixed what failed,
+and ran them again. On a 41 line rubric, plain Sonnet met 27 lines. With the skill, Sonnet went from
+36 to 40, Haiku from 28 to 36 and Opus from 38 to 41. The biggest wins were not inventing facts,
+hitting a script's length, and keeping my tone when polishing.
 
 Two honest limits. Haiku still invents details, so use Sonnet or Opus to write under my name. And these
-are single runs scored by one reader, so treat the numbers as a direction. The full write-up, the
-caveats and the raw outputs are in [evals/RESULTS.md](evals/RESULTS.md).
+are single runs scored by one reader, so treat the numbers as a direction. Results, caveats and raw
+outputs are in [evals/RESULTS.md](evals/RESULTS.md).
 
 ## What is in the repo
 
@@ -147,7 +153,7 @@ signature/
 │   │                          scripts, posts, examples, samples
 │   └── scripts/ai_check.py    the checker
 ├── hooks/                     the session-start reminder
-├── docs/                      checker.md, paste-prompt.md
+├── docs/                      checker.md, restyle.md, develop.md, paste-prompt.md
 ├── evals/                     scenarios, trigger queries, results
 ├── tests/                     unit tests and fixtures
 ├── .github/workflows/         tests on every push, a release zip on a tag
@@ -156,20 +162,8 @@ signature/
 
 ## Develop
 
-```bash
-python3 -m unittest discover -s tests -v
-```
-
-The tests check that my approved writing stays clean and AI-flavoured text gets flagged. They also
-check that the docs pass the checker and that the skill follows Anthropic's authoring rules. Static
-checks cover the plugin itself: the manifests agree, the hook points at a real script and the commands
-are well formed. GitHub Actions runs all of it on every push. Pushing a tag such as `v2.1.0` attaches
-a zip of the skill to a release, ready to upload to Claude.ai.
-
-To change the voice, edit the matching file in `references/` and keep `SKILL.md` short. Then bump
-`version` in `.claude-plugin/plugin.json`, add a line to the changelog, and run
-`/plugin marketplace update signature`. When I correct the same thing twice, it goes into the guide.
-The [evals](evals/README.md) show whether the change helped.
+Run the tests with `python3 -m unittest discover -s tests -v`. Releases, changing the voice and what the
+tests cover are in [docs/develop.md](docs/develop.md).
 
 ## Make it yours
 
