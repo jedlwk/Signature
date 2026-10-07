@@ -8,6 +8,7 @@ measurement.
 - Summary
 - Scores
 - What the runs showed
+- Plan and apply, end to end
 - Description routing test
 - Caveats
 - Reproduce
@@ -82,6 +83,26 @@ Hence the model advice in the summary.
 **8. Placeholders are the cost of honesty.** Sonnet and Opus left bracketed placeholders in slides
 and the script instead of making content up. That is the intended behaviour, but it means more
 back and forth. The LinkedIn post from Sonnet 2 is thin for the same reason.
+
+## Plan and apply, end to end
+
+Separate from the writing evals above, the plan-first restyle was run end to end by fresh Sonnet agents on
+throwaway projects, and each result was checked by hand afterwards. Three runs, one project each.
+
+| Run | What it tested | Result |
+|---|---|---|
+| Style, Markdown and text | Plan, tick three boxes, apply | Only the ticked items changed. Project rules and a legal file were respected |
+| Style, a mixed project | Word, PowerPoint, HTML, a notebook, Markdown and Python in one plan | 11 of 12 applied. The twelfth kept a placeholder, so the editor refused it. Word and PowerPoint formatting intact |
+| Rename, from a bare session | Only the bootstrap prompt, then plan, tick five, apply through the installed commands | The plan held back a customer quote, a package name and four ambiguous items. Apply changed only the five ticked ones |
+
+What these runs found and fixed: the editor and the plan numbered HTML and notebook locations
+differently, code edits failed when the Before text included a `#` or quotes, a NEEDS FACT item would have
+written its placeholder, a stale "Nothing has been changed yet" line was left in the plan, and a session tried
+`git stash` on the project. The bare session could clone the repo but could not run the cloned scripts, so it
+built its plan by hand and said so.
+
+Not tested: a session that opens Word or PowerPoint through computer use, a Codex session, Claude.ai, and a
+chat with no shell. The playbook for those is written from how the tools work, and unproven.
 
 ## Description routing test
 

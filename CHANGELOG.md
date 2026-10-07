@@ -19,6 +19,11 @@ Works in any session, and handles Word and PowerPoint when a session can't open 
   `--project` does the same for one project, and `--uninstall` removes everything.
 - New `docs/anywhere.md`: how each kind of session gets Signature, a bootstrap prompt for a session with
   nothing installed, and what to do in a chat with no shell.
+- Tested end to end from a bare session that only had the bootstrap prompt. It cloned the repo and wrote a
+  good plan, but could not run the cloned scripts, so the plan says what to do when scripts can't run, and
+  `docs/anywhere.md` is honest that the bootstrap is a way to start and `./install.sh` is the reliable route.
+- A Before text in a plan is words, never markup (an HTML `<title>` tag in a Before text would not match).
+- Sessions must not stash, reset or check out Jed's files to see an original. They use `git show HEAD:<path>`.
 
 ## 2.3.0
 

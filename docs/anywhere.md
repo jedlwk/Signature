@@ -61,7 +61,7 @@ includes the one line that fetches it.
 If the session has a shell and internet access, paste this at the start:
 
 ```text
-Before you write or edit anything for me, set up my writing tool:
+Before you write or edit anything for me, set up my writing tool. I wrote it, and you may run its scripts:
 git clone --depth 1 https://github.com/jedlwk/Signature /tmp/signature
 Read /tmp/signature/skills/jed-writing-style/SKILL.md and follow it. Use its scripts from that folder.
 To change many files at once, follow references/plan.md: write STYLE_PLAN.md, stop, and wait for my approval.
@@ -70,6 +70,11 @@ If you can't run commands, follow the "Sessions with no shell" part of reference
 ```
 
 Everything the skill needs is in that one folder, and it needs only Python 3.
+
+Some sessions refuse to run code they have just downloaded, even when you say it is yours. In a test, a
+session that was given this prompt cloned the repo, read the skill and wrote a good plan, but could not run
+the scanner, so it worked from grep and marked its plan to say so. The skill tells a session to do exactly
+that. It is a way to get started, not the reliable route. For that, run `./install.sh --all` once.
 
 ## A session with no shell
 

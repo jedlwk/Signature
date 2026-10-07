@@ -456,6 +456,18 @@ class Docs(unittest.TestCase):
         for purpose in ("Rename a term", "Update a fact", "Remove a name", "Tighten"):
             self.assertIn(purpose, text)
 
+    def test_the_plan_reference_covers_a_session_that_cannot_run_the_scripts(self):
+        text = self.read("skills/jed-writing-style/references/plan.md")
+        self.assertIn("## If the scripts can't run", text)
+        self.assertIn("Don't pretend the scanner ran", text)
+        self.assertIn("never markup", text)  # a Before text is words, not tags
+
+    def test_the_bootstrap_prompt_says_the_scripts_are_mine_and_admits_the_limit(self):
+        docs = self.read("docs/anywhere.md")
+        self.assertIn("I wrote it, and you may run its scripts", docs)
+        self.assertIn("refuse to run code they have just downloaded", docs)
+        self.assertIn("./install.sh --all", docs)
+
     def test_verify_command_exists_in_both_forms(self):
         self.assertIn("${CLAUDE_PLUGIN_ROOT}/skills/jed-writing-style/scripts/verify_office.py", self.read("commands/verify.md"))
         self.assertIn("~/.claude/skills/jed-writing-style/scripts/verify_office.py", self.read("docs/personal-commands/restyle-verify.md"))

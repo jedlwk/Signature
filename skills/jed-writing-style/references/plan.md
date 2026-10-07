@@ -7,6 +7,7 @@ between them. Stage one writes a plan and changes nothing. Stage two applies onl
 
 ## Contents
 - Purposes
+- If the scripts can't run
 - The rules
 - Stage one: write the plan
 - The plan file
@@ -62,13 +63,29 @@ the same but mean something else, or text Jed didn't write.
   in the file, mark it NEEDS FACT and leave a placeholder.
 - **Change sentences, not meaning.** Never touch quotes, code blocks, data tables, names, numbers,
   legal or licence text, or text Jed didn't write.
+- **Never stash, reset or check out Jed's files to look at an original.** Get the old version with
+  `git show HEAD:<path>`, or from the backup folder. Those leave the working tree alone.
 - **Plan the pattern, not every instance.** A file with 200 dashes gets one rule with a count and
   three examples, not 200 rows. Write it with `Where: all` and a short Before such as "serves as".
 - **Every change has a Where.** In `.docx`, `.pptx`, `.html` and `.ipynb` files it is the unit number the
   scanner gave (`unit` in the JSON). In text and code files it is the line. The editor uses it to
   pick the right match when the same words appear twice.
+- **A Before text is the words, never markup.** In HTML it is the visible text, such as `Acme`, never
+  `<title>Acme</title>`. The editor only matches text, and a Before with tags in it is not found.
 - **In Word and PowerPoint, one change is one paragraph.** The Before text must sit inside a single
   paragraph, copied exactly as `scripts/apply_edits.py --units <file>` prints it. Split anything longer.
+
+## If the scripts can't run
+
+Some sessions refuse to run code that was just downloaded, or can't run commands at all. Say so at the top of
+the plan under Scope, in one line, and carry on by hand. Don't pretend the scanner ran.
+
+- Find the places with grep, and read the text inside Word and PowerPoint files from their XML.
+- Use `Where: all` only for a plain rename. For anything else, name the slide or paragraph in words.
+- Tell Jed to re-read the units with `apply_edits.py --units` before applying, or to install Signature with
+  `./install.sh`, which is the reliable route.
+- At apply time, never edit a Word or PowerPoint file by hand. Give Jed the find and replace table from
+  `references/office.md` instead.
 
 ## Stage one: write the plan
 
