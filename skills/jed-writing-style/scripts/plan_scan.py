@@ -10,6 +10,8 @@ Usage:
     python3 plan_scan.py --strings             also read user-facing strings in source files (implies --code)
     python3 plan_scan.py --json                full result as JSON, for writing the plan
     python3 plan_scan.py --exclude "drafts/*" --exclude legacy   skip paths (also read from .signatureignore)
+    python3 plan_scan.py --find "Acme"         list every place a word or phrase appears, in every file type
+    python3 plan_scan.py --find "Acme\\w*" --regex --ignore-case   the same, as a regular expression
     python3 plan_scan.py --all                 don't skip files that look like samples or third-party text
     python3 plan_scan.py --top 40              rows shown in the table (default 25)
     python3 plan_scan.py --max-findings 12     findings kept per file (default 20)
@@ -17,7 +19,7 @@ Usage:
 It uses `git ls-files` inside a git repo, so .gitignore is respected. Elsewhere it walks the folder
 and skips the usual noise (node_modules, virtualenvs, build output, hidden folders).
 
-Exit codes: 0 done, 2 nothing to scan or a bad path.
+Exit codes: 0 done, 1 --find found nothing, 2 nothing to scan, a bad path or a bad pattern.
 """
 import argparse
 import fnmatch
@@ -33,7 +35,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import ai_check  # noqa: E402
 import formats  # noqa: E402
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 # Prose Jed writes. These are scanned by default, and apply_edits.py can edit every one of them.
 PROSE_EXT = {".md", ".markdown", ".txt", ".rst", ".adoc", ".docx", ".pptx", ".html", ".htm", ".ipynb"}
@@ -247,6 +249,67 @@ def folder_summary(scanned):
     return dict(sorted(folders.items(), key=lambda kv: (-kv[1]["P0"], kv[0])))
 
 
+def find_in_text(text, pattern):
+    """Matches in a block of text: (line number, snippet, matched text)."""
+    out = []
+    for m in pattern.finditer(text):
+        line = text.count("\n", 0, m.start()) + 1
+        a, b = max(0, m.start() - 40), min(len(text), m.end() + 40)
+        out.append((line, " ".join(text[a:b].split()), m.group(0)))
+    return out
+
+
+def find(root, pattern, paths=None, include_code=False, exclude=None, keep_all=False, strings=False):
+    """Every place a pattern appears across all scannable files, with a where and a unit for each."""
+    root = Path(root).resolve()
+    patterns = load_ignore(root, exclude)
+    files, skipped, total = [], [], 0
+    for rel in candidates(root, paths):
+        ok, reason = classify(root, rel, include_code, patterns, keep_all)
+        if not ok:
+            if reason not in ("not prose", "skipped folder"):
+                skipped.append({"path": str(rel), "reason": reason})
+            continue
+        suffix = rel.suffix.lower()
+        try:
+            units = formats.read_units(str(root / rel)) if suffix in formats.OFFICE_EXT or suffix in (".html", ".htm", ".ipynb") else None
+            if units is not None:
+                hits = []
+                for u in units:
+                    for line, snip, matched in find_in_text(u.text, pattern):
+                        hits.append({"where": u.label, "unit": u.number, "snippet": snip, "matched": matched})
+            else:
+                raw = ai_check.read_text(str(root / rel))
+                if suffix in ai_check.CODE_EXT:
+                    raw = ai_check.extract_comments(raw, suffix, strings)
+                hits = [{"where": "line %d" % line, "unit": line, "snippet": snip, "matched": matched}
+                        for line, snip, matched in find_in_text(raw, pattern)]
+        except Exception as e:
+            skipped.append({"path": str(rel), "reason": "could not read: %s" % e})
+            continue
+        if hits:
+            total += len(hits)
+            files.append({"path": str(rel), "count": len(hits), "matches": hits})
+    files.sort(key=lambda f: (-f["count"], f["path"]))
+    return {"root": str(root), "pattern": pattern.pattern, "files": files, "total": total, "skipped": skipped}
+
+
+def find_markdown(result, top=25):
+    out = ["%d matches in %d files for %r" % (result["total"], len(result["files"]), result["pattern"]), ""]
+    if not result["files"]:
+        return "\n".join(out + ["Nothing found."])
+    out += ["| File | Matches | Where |", "|---|---|---|"]
+    for f in result["files"][:top]:
+        where = ", ".join(sorted({m["where"] for m in f["matches"]}, key=lambda w: (len(w), w))[:4])
+        out.append("| %s | %d | %s |" % (f["path"], f["count"], where))
+    if len(result["files"]) > top:
+        out.append("| and %d more files | | |" % (len(result["files"]) - top))
+    out += ["", "Examples:"]
+    for f in result["files"][:5]:
+        out.append("- %s (%s): ...%s..." % (f["path"], f["matches"][0]["where"], f["matches"][0]["snippet"]))
+    return "\n".join(out)
+
+
 def markdown(result, top=25):
     rows = result["scanned"]
     out = ["Scanned %d files in %s" % (len(rows), result["root"]), ""]
@@ -283,6 +346,9 @@ def main(argv=None):
     ap.add_argument("--json", action="store_true", help="print the full result as JSON")
     ap.add_argument("--exclude", action="append", metavar="GLOB", help="skip paths matching this pattern. Repeatable")
     ap.add_argument("--strings", action="store_true", help="also read user-facing strings in source files (implies --code)")
+    ap.add_argument("--find", metavar="TEXT", help="list every place this text appears, in every file type, instead of scoring style")
+    ap.add_argument("--regex", action="store_true", help="with --find, treat the text as a regular expression")
+    ap.add_argument("--ignore-case", action="store_true", help="with --find, ignore upper and lower case")
     ap.add_argument("--all", action="store_true", help="include files that look like samples or third-party text")
     ap.add_argument("--top", type=int, default=25, metavar="N", help="rows shown in the table (default 25)")
     ap.add_argument("--max-findings", type=int, default=20, metavar="N", help="findings kept per file (default 20)")
@@ -294,6 +360,15 @@ def main(argv=None):
         if not (root / p).exists():
             print("plan_scan: no such path: %s" % p, file=sys.stderr)
             return 2
+    if args.find:
+        try:
+            pattern = re.compile(args.find if args.regex else re.escape(args.find), re.I if args.ignore_case else 0)
+        except re.error as e:
+            print("plan_scan: that is not a valid pattern: %s" % e, file=sys.stderr)
+            return 2
+        found = find(root, pattern, args.paths, args.code or args.strings, args.exclude, args.all, args.strings)
+        print(json.dumps(found, indent=2) if args.json else find_markdown(found, args.top))
+        return 0 if found["total"] else 1
     result = scan(root, args.paths, args.code or args.strings, args.max_findings, args.exclude, args.all, args.strings)
     if not result["scanned"]:
         print("plan_scan: nothing to scan here. Prose files are .md, .txt, .rst, .docx and .pptx. Add --code for comments.", file=sys.stderr)

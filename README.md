@@ -71,13 +71,17 @@ You can also call it on purpose:
 | `/signature:learn` | Compares what Claude wrote with what I changed it to, and proposes a rule or an example. Asks before writing. |
 | `/signature:plan` | Scans the project and writes `STYLE_PLAN.md`, a plan to bring it into my style. Changes nothing. |
 | `/signature:apply` | Applies only the changes I approved in that plan. |
+| `/signature:verify` | Checks a changed Word or PowerPoint file in place of opening it. |
 
 **Restyle a whole project.** Run `/signature:plan` in any project. It writes `STYLE_PLAN.md` and stops.
 I tick the changes I want, then run `/signature:apply`. It reads and edits Word, PowerPoint, HTML,
 notebooks, Markdown and text files, plus code comments and user-facing strings on request. Word and
-PowerPoint keep their formatting, because only the text changes. It needs no other skill. Without the
-plugin, the personal commands in `docs/personal-commands/` do the same as `/restyle` and `/restyle-apply`.
-See [docs/restyle.md](docs/restyle.md).
+PowerPoint keep their formatting, because only the text changes. It also handles other jobs, such as
+`/signature:plan rename Acme to Zenith`. See [docs/restyle.md](docs/restyle.md).
+
+**Use it in any session.** `./install.sh --all` sets it up for Claude Code, the desktop app and Codex. A
+session with nothing installed can fetch it with one pasted prompt, and a chat with no shell gets a find
+and replace table. See [docs/anywhere.md](docs/anywhere.md).
 
 `/signature:learn` keeps a private log of my corrections in `~/.claude/signature/` on my machine. It is
 never committed, and anything confidential is replaced with a placeholder first.
@@ -148,19 +152,17 @@ outputs are in [evals/RESULTS.md](evals/RESULTS.md).
 
 ```text
 signature/
-├── .claude-plugin/            plugin.json and marketplace.json
-├── commands/                  /signature:check, :polish, :learn
 ├── skills/jed-writing-style/
 │   ├── SKILL.md               front page: quick card, modes, workflow
-│   ├── references/            voice, AI tells, code, documents, slides,
-│   │                          scripts, posts, examples, samples
-│   └── scripts/ai_check.py    the checker
-├── hooks/                     the session-start reminder
-├── docs/                      checker.md, restyle.md, develop.md, paste-prompt.md
-├── evals/                     scenarios, trigger queries, results
-├── tests/                     unit tests and fixtures
-├── .github/workflows/         tests on every push, a release zip on a tag
-└── CHANGELOG.md, LICENSE, README.md
+│   ├── references/            voice, tells, code, documents, slides, scripts, posts,
+│   │                          examples, samples, plan, office
+│   └── scripts/               ai_check, plan_scan, apply_edits, verify_office, formats
+├── commands/                  /signature:check, polish, learn, plan, apply, verify
+├── .claude-plugin/  hooks/    the plugin manifest, the session-start reminder
+├── docs/                      checker, restyle, anywhere, develop, paste-prompt
+├── evals/  tests/             scenarios and results, unit tests and fixtures
+├── install.sh                 sets it up for Claude Code, Codex and any project
+└── .github/  CHANGELOG.md  LICENSE  README.md
 ```
 
 ## Develop

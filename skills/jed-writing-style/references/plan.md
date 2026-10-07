@@ -1,10 +1,12 @@
-# Plan mode: restyle a project
+# Plan mode: change a whole project
 
-Use this when Jed wants a whole project brought into his writing style: "update my docs to my style",
-"restyle this repo", `/signature:plan`. It works in two stages with a hard stop between them.
-Stage one writes a plan and changes nothing. Stage two applies only what Jed approved.
+Use this when Jed wants a change made across everything a project says. The usual job is bringing it into
+his writing style: "update my docs to my style", "restyle this repo", `/signature:plan`. It also handles
+other jobs, such as renaming a term or updating a fact everywhere. It works in two stages with a hard stop
+between them. Stage one writes a plan and changes nothing. Stage two applies only what Jed approved.
 
 ## Contents
+- Purposes
 - The rules
 - Stage one: write the plan
 - The plan file
@@ -28,6 +30,25 @@ Every kind of writing in a project that can be edited safely.
 
 Not editable here, and listed in the plan with the reason: `.pdf` (edit the file it came from), `.xlsx`,
 and old `.doc` and `.ppt` files. A slide that is a picture has no editable text, and the plan says so.
+
+## Purposes
+
+Jed can state a purpose in plain words after the command. With none, the purpose is his writing style.
+Every purpose uses the same two stages, the same plan file and the same editor.
+
+| Purpose | Example | How to gather the changes |
+|---|---|---|
+| **Style** (the default) | `/signature:plan` | `scripts/plan_scan.py --json` ranks files by style problems |
+| **Rename a term** | `/signature:plan rename Acme to Zenith` | `plan_scan.py --find "Acme" --ignore-case` lists every place. Use `Where: all` |
+| **Update a fact** | `/signature:plan change 40 users to 55` | `plan_scan.py --find "40"` and read each match. Change only the ones that mean this fact |
+| **Remove a name** | `/signature:plan anonymise client names` | `plan_scan.py --find` for each name. Replace with a placeholder Jed approves |
+| **Tighten** | `/signature:plan cut every slide to two lines` | Read the units with `apply_edits.py --units`, then rewrite the long ones |
+| **Anything else** | `/signature:plan make the tone warmer` | Read the units, draft the rewrites, keep every fact |
+
+For a purpose other than style, write the purpose at the top of the plan under Scope. Don't add style
+changes Jed didn't ask for, though a single sentence at the end may offer to run the style plan next.
+Everything under "The rules" still applies, and a rename must not touch quotes, code, names that look
+the same but mean something else, or text Jed didn't write.
 
 ## The rules
 
@@ -175,10 +196,16 @@ Run this only when Jed has approved something.
    without a Where, is skipped and reported. Never retry a skipped change with looser text. Tell Jed.
 5. **Check again.** Run `scripts/ai_check.py` on each changed file with its register. Fix anything the
    edit introduced, with another edits file. One more pass at most.
+   For every changed `.docx` or `.pptx`, also run `scripts/verify_office.py <file> --git` (or `--against`
+   the backup). Then follow `references/office.md`. It says what to do with each result, how to check a
+   slide that grew, what a session that can open Word or PowerPoint should do, and what to give Jed when
+   the session has no shell.
 7. **Update the plan.** Replace the line "Nothing has been changed yet" with what was applied and what
    wasn't. Mark applied items, and mark skipped ones with the reason the editor gave. Add the date, and
    a before and after score for every file you changed.
-8. **Report.** Files changed, changes applied, changes skipped and why, and the new scores. Show
+8. **Report.** Files changed, changes applied, changes skipped and why, and the new scores. For Word and
+   PowerPoint files, end with the lines from `references/office.md`: what was checked, what was looked
+   at, and what Jed should check. Show
    `git diff --stat` if it's a repo. Don't commit unless Jed asks. Say that `STYLE_PLAN.md` and
    `.signature-backup/` are working files Jed can delete or add to `.gitignore`.
 

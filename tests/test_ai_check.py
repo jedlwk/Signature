@@ -492,14 +492,14 @@ class PluginShape(unittest.TestCase):
                     self.assertIn("${CLAUDE_PLUGIN_ROOT}/skills/jed-writing-style/scripts/ai_check.py", text)
 
     def test_every_script_path_in_the_docs_exists(self):
-        for path in [ROOT / "README.md", ROOT / "docs" / "checker.md", ROOT / "docs" / "restyle.md", ROOT / "docs" / "develop.md", SKILL / "SKILL.md"] + sorted((SKILL / "references").glob("*.md")):
+        for path in [ROOT / "README.md", ROOT / "docs" / "checker.md", ROOT / "docs" / "restyle.md", ROOT / "docs" / "develop.md", ROOT / "docs" / "anywhere.md", SKILL / "SKILL.md"] + sorted((SKILL / "references").glob("*.md")):
             for rel in set(__import__("re").findall(r"scripts/([a-z_]+\.py)", path.read_text())):
                 with self.subTest(path.name + " " + rel):
                     self.assertTrue((SKILL / "scripts" / rel).exists())
 
     def test_relative_links_resolve(self):
         import re
-        pages = [ROOT / "README.md", ROOT / "CHANGELOG.md", ROOT / "docs" / "checker.md", ROOT / "docs" / "restyle.md", ROOT / "docs" / "develop.md", ROOT / "evals" / "README.md",
+        pages = [ROOT / "README.md", ROOT / "CHANGELOG.md", ROOT / "docs" / "checker.md", ROOT / "docs" / "restyle.md", ROOT / "docs" / "develop.md", ROOT / "docs" / "anywhere.md", ROOT / "evals" / "README.md",
                  ROOT / "evals" / "RESULTS.md", SKILL / "SKILL.md"] + sorted((SKILL / "references").glob("*.md"))
         for page in pages:
             for target in re.findall(r"\]\((?!https?:|mailto:|#)([^)#\s]+)", page.read_text()):

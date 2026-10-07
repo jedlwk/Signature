@@ -5,6 +5,7 @@ between them: a plan that changes nothing, then an apply step that does only wha
 
 ## Contents
 - The flow
+- Other jobs, not only style
 - What it covers
 - Choosing what to leave out
 - The scanner
@@ -23,17 +24,29 @@ In any project:
    anything listed under "Needs your input".
 3. Run `/signature:apply`. Claude applies only the approved changes, checks the result, and reports.
 
-Without the plugin, the same two steps are `/restyle` and `/restyle-apply`. They are personal commands that
-work in every project. Install them with:
-
-```bash
-cp docs/personal-commands/*.md ~/.claude/commands/
-```
-
-They expect the skill at `~/.claude/skills/jed-writing-style`.
+Without the plugin, the same steps are `/restyle`, `/restyle-apply` and `/restyle-verify`. They are personal
+commands that work in every project. `./install.sh --claude` puts them in `~/.claude/commands`, or copy
+`docs/personal-commands/*.md` there yourself. They expect the skill at `~/.claude/skills/jed-writing-style`.
+[docs/anywhere.md](anywhere.md) covers every other kind of session.
 
 Ask for specific files by naming them: `/signature:plan docs/ README.md`. Add `--code` to include comments
 and docstrings in source files, or `--strings` to include user-facing text inside code as well.
+
+## Other jobs, not only style
+
+The plan, the approval and the editor work for any change across a project. Say the job in plain words
+after the command.
+
+```text
+/signature:plan rename Acme to Zenith
+/signature:plan change 40 users to 55
+/signature:plan anonymise the client names
+/signature:plan cut every slide to two lines
+```
+
+For a rename or a fact, the scanner's `--find` option lists every place the text appears, in every file type,
+with the unit number the editor needs. The plan then lists each place for you to tick. With no job stated, the
+job is your writing style.
 
 ## What it covers
 
@@ -93,6 +106,9 @@ python3 skills/jed-writing-style/scripts/plan_scan.py
 | `--code` | Also read comments and docstrings in source files. |
 | `--strings` | Also read user-facing strings in source files. Implies `--code`. |
 | `--exclude GLOB` | Skip matching paths. Repeatable. |
+| `--find TEXT` | List every place the text appears, in every file type, instead of scoring style. |
+| `--regex` | With `--find`, treat the text as a regular expression. |
+| `--ignore-case` | With `--find`, ignore upper and lower case. |
 | `--all` | Don't skip files that look like samples or third-party text. |
 | `--top N` | Rows in the table. Default 25. |
 | `--max-findings N` | Findings kept per file. Default 20. |
@@ -154,6 +170,26 @@ What it guarantees:
 - **A skipped change never stops the others.** Each ends as `applied`, `not_found`, `ambiguous`,
   `unsupported` or `error`, with the reason.
 
+## Checking Word and PowerPoint files
+
+I can't open Word or PowerPoint in most sessions, so `verify_office.py` checks a changed file in their place.
+`/signature:verify <file>` runs it.
+
+```bash
+python3 skills/jed-writing-style/scripts/verify_office.py deck.pptx --git
+```
+
+It needs no libraries. It checks that the file is intact (the zip, every XML part, every internal link), that only
+text changed, that the paragraph count is the same, and lists every changed paragraph before and after. It warns
+when text on a slide grew enough to overflow its box. If python-docx or python-pptx is installed it opens the file
+with them. If LibreOffice is installed, `--render DIR` converts the file to PDF, compares page counts, and writes
+PNGs a session can look at.
+
+`references/office.md` is the playbook a session follows. It says what to do on each rung: a shell, the
+libraries, LibreOffice, computer use in the desktop app (open a copy, look, close without saving) or a chat
+with no shell (a find and replace table for Jed to apply by hand). It ends with the lines to report: what was
+checked, what was looked at, and what Jed should check.
+
 ## Approving and applying
 
 You approve by ticking boxes in `STYLE_PLAN.md`, or by telling Claude: "apply all", "apply file 1",
@@ -162,8 +198,8 @@ You approve by ticking boxes in `STYLE_PLAN.md`, or by telling Claude: "apply al
 ## Limits
 
 - **Tested without Word or PowerPoint.** Edited files are checked byte by byte, parsed as XML, and opened with
-  python-docx and python-pptx, but not opened in Word or PowerPoint themselves. Open a changed file once
-  and look before you rely on it.
+  python-docx and python-pptx, but not opened in Word or PowerPoint themselves. `verify_office.py` and the playbook
+  narrow the risk, and they don't remove it. Open a changed file once and look before you rely on it.
 - **No tracked changes.** Edits are made directly. The plan is the review, and git or the backup is the undo.
 - **One paragraph at a time.** In Word and PowerPoint, a change can't span two paragraphs, a tab or a line
   break. Longer edits are split in the plan.

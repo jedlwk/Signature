@@ -1,6 +1,6 @@
 ---
 name: jed-writing-style
-description: Applies Jed's writing voice and anti-AI rules to anything written under Jed's name, with separate rules for code, documents, slides, scripts and posts, plus a checker that flags AI tells. Use when drafting, rewriting, polishing or reviewing code comments, commit messages, READMEs, customer docs and Q&A, reports, course assignments, slides, speaker scripts, LinkedIn or Medium posts, emails, messages, peer comments, taglines or names. Also use when Jed asks to sound less like AI, keep Jed's tone, run an AI check or AI score, or restyle a whole project or its docs.
+description: Applies Jed's writing voice and anti-AI rules to anything written under Jed's name, with separate rules for code, documents, slides, scripts and posts, plus a checker that flags AI tells. Use when drafting, rewriting, polishing or reviewing code comments, commit messages, READMEs, customer docs and Q&A, reports, course assignments, slides, speaker scripts, LinkedIn or Medium posts, emails, messages, peer comments, taglines or names. Also use when Jed asks to sound less like AI, keep Jed's tone, run an AI check or AI score, restyle a whole project or its docs, change a term or fact across a project, or check a changed Word or PowerPoint file.
 ---
 
 # Write like Jed
@@ -36,7 +36,7 @@ the rest of this guide.
 | "rewrite", "too AI", "fix this" | **Rewrite** | Rebuild AI-sounding text from what it is trying to say. |
 | "check", "AI score", "review" | **Audit** | Run the checker. Report findings grouped P0, then P1, then P2. Don't rewrite unless asked. |
 | "give me options", names, taglines | **Options** | Give 3 to 5 real options and say which you would pick. |
-| "restyle this project", "update my docs to my style" | **Plan** | Scan the project and write `STYLE_PLAN.md`. Change nothing. Wait for approval, then apply only what was approved. |
+| "restyle this project", "rename X to Y everywhere", "update my docs to my style" | **Plan** | Scan the project and write `STYLE_PLAN.md`. Change nothing. Wait for approval, then apply only what was approved. |
 
 ## Open the right reference
 
@@ -48,6 +48,7 @@ the rest of this guide.
 | Speaker script, voiceover, demo walkthrough | [references/scripts.md](references/scripts.md) | `script` |
 | LinkedIn, Medium, messages, emails, peer comments, names | [references/posts-and-messages.md](references/posts-and-messages.md) | `post`, `message` |
 | A whole project, including Word, PowerPoint, HTML and notebooks | [references/plan.md](references/plan.md) | per file |
+| Any `.docx` or `.pptx`, in any session, whatever it can or can't open | [references/office.md](references/office.md) | n/a |
 
 Always useful:
 
@@ -117,6 +118,7 @@ text. The goal is writing that sounds like Jed, not text that games a detector.
 - `/signature:polish <file or text>` polishes with minimal changes, then checks.
 - `/signature:plan` scans the project and writes `STYLE_PLAN.md`. It changes nothing.
 - `/signature:apply` applies only the changes Jed approved in that plan, using `scripts/apply_edits.py`.
+- `/signature:verify <file>` checks a changed Word or PowerPoint file in place of opening it.
 - `/signature:learn` compares what Claude wrote with what Jed changed it to, and proposes a rule or
   an example. It asks before writing, and keeps the log private.
 

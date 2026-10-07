@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.4.0
+
+Works in any session, and handles Word and PowerPoint when a session can't open them.
+
+- New playbook, `references/office.md`. It tells a session what to do with `.docx` and `.pptx` files based on
+  what it has: a shell, python-docx and python-pptx, LibreOffice, computer use in the desktop app, or only
+  a chat window. It ends with the lines to report, including what could not be checked.
+- New `scripts/verify_office.py`, a check that stands in for opening the file. It tests that the file is intact,
+  that only text changed, that the paragraph count is the same, lists each changed paragraph, and warns when
+  slide text grew enough to overflow. With LibreOffice installed, `--render` compares page counts and writes
+  PNGs. New command `/signature:verify` and personal command `/restyle-verify`.
+- The editor flags an edit that makes slide text much longer.
+- The restyle now takes any job, such as renaming a term or updating a fact, with the same plan, approval
+  and editor. `plan_scan.py --find` lists every place a text appears in every file type.
+- New `install.sh`. `--all` installs the skill and commands for Claude Code, copies the skill for Codex, and adds
+  a short note to `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md`, so any session knows to use Signature.
+  `--project` does the same for one project, and `--uninstall` removes everything.
+- New `docs/anywhere.md`: how each kind of session gets Signature, a bootstrap prompt for a session with
+  nothing installed, and what to do in a chat with no shell.
+
 ## 2.3.0
 
 The restyle can now edit everything, not only plan it.

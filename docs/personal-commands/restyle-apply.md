@@ -5,8 +5,7 @@ argument-hint: [all | file N | 1.1 to 1.4 | P0]
 
 Apply mode. Apply the approved changes in STYLE_PLAN.md: $ARGUMENTS
 
-Load the jed-writing-style skill (`~/.claude/skills/jed-writing-style`) and follow `references/plan.md`,
-stage two.
+Load the jed-writing-style skill (`~/.claude/skills/jed-writing-style`) and follow `references/plan.md`, stage two.
 
 1. Read `STYLE_PLAN.md`. Approved means ticked boxes, or what Jed said above. If nothing is approved and
    Jed said nothing, ask. Never assume everything.
@@ -19,6 +18,8 @@ stage two.
    `--backup .signature-backup/<timestamp>` to the real run. In a git repo leave it off, so the editor can
    skip files with uncommitted changes.
 4. Skipped changes are reported, not forced. Don't retry them with looser text. Tell Jed.
-5. Run `python3 ~/.claude/skills/jed-writing-style/scripts/ai_check.py` on each changed file.
+5. Run `python3 ~/.claude/skills/jed-writing-style/scripts/ai_check.py` on each changed file. For each changed `.docx` or `.pptx`, also run
+   `python3 ~/.claude/skills/jed-writing-style/scripts/verify_office.py <file> --git`, and follow `references/office.md`.
 6. Update the plan (replace the "Nothing has been changed yet" line), then report what changed, what was skipped and why,
-   and the new scores. Mention that `STYLE_PLAN.md` and `.signature-backup/` are working files. Don't commit.
+   and the new scores. For Word and PowerPoint files, end with the lines from `references/office.md`. Mention that
+   `STYLE_PLAN.md` and `.signature-backup/` are working files. Don't commit.

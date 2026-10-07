@@ -201,14 +201,14 @@ class Wiring(unittest.TestCase):
         self.assertIn("${CLAUDE_PLUGIN_ROOT}/skills/jed-writing-style/scripts/ai_check.py", apply)
 
     def test_personal_commands_match_the_plugin_ones(self):
-        for personal, plugin in (("restyle.md", "plan.md"), ("restyle-apply.md", "apply.md")):
+        for personal, plugin in (("restyle.md", "plan.md"), ("restyle-apply.md", "apply.md"), ("restyle-verify.md", "verify.md")):
             mine = (ROOT / "docs" / "personal-commands" / personal).read_text()
             theirs = (ROOT / "commands" / plugin).read_text()
             self.assertNotIn("CLAUDE_PLUGIN_ROOT", mine)
             self.assertIn("~/.claude/skills/jed-writing-style/scripts/", mine)
             normal = lambda t: t.replace("${CLAUDE_PLUGIN_ROOT}/skills/jed-writing-style", "~/.claude/skills/jed-writing-style")
             for line in normal(theirs).splitlines():
-                if line.startswith(("Load the jed-writing-style", "Plan mode", "Apply mode")):
+                if line.startswith(("Load the jed-writing-style", "Plan mode", "Apply mode", "Verify mode", "Load the jed-writing-style skill (")):
                     continue
                 self.assertIn(line.strip(), mine, line)
 

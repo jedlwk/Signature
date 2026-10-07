@@ -51,7 +51,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import ai_check  # noqa: E402
 import formats  # noqa: E402
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
+
+# A slide's text box does not grow with its text, so an edit that makes it much longer is flagged.
+GROWTH_NOTE = 0.25
 
 
 class Skip(Exception):
@@ -260,7 +263,11 @@ def edit_office(path, suffix, edits, dry_run):
             xml = new_xml
             changed.update({n: True for n in by_part})
             applied_after.append(e["after"])
-            results[e["id"]] = ("applied", len(chosen), "")
+            note = ""
+            grew = (len(e["after"]) - len(e["before"])) / max(len(e["before"]), 1)
+            if suffix == ".pptx" and grew > GROWTH_NOTE and len(e["after"]) - len(e["before"]) >= 8:
+                note = "grew %d%%: check that slide for text running out of its box" % round(grew * 100)
+            results[e["id"]] = ("applied", len(chosen), note)
         except Skip as s:
             results[e["id"]] = (s.status, 0, s.detail)
 
@@ -471,7 +478,7 @@ def main(argv=None):
         print(json.dumps(report, indent=2))
     else:
         for r in report:
-            note = "" if r["status"] == "applied" else "  " + r["detail"]
+            note = "  " + r["detail"] if r["detail"] else ""
             print("%-8s %-8s %s%s" % (r["id"], r["status"] + ("*%d" % r["count"] if r["count"] > 1 else ""), r["file"], note))
         applied = sum(1 for r in report if r["status"] == "applied")
         print("\n%d of %d edits %s%s." % (applied, len(report), "would apply" if args.dry_run else "applied",
