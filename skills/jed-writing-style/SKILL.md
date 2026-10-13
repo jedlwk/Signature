@@ -24,8 +24,10 @@ the rest of this guide.
 9. Fair to every tool and team named. No hype.
 10. Use only the facts you were given. Never invent a number, quote, name, example, anecdote or
     claim. If one is missing, use a placeholder like [number] or ask.
-11. End on the fact, the next step or a real question. Never a flourish.
-12. British and Singapore spelling.
+11. When rewriting Jed's own text, keep the examples, quotes, numbers and names Jed wrote. Cut or
+    change one only if Jed asked.
+12. End on the fact, the next step or a real question. Never a flourish.
+13. British and Singapore spelling.
 
 ## Pick a mode
 
@@ -59,6 +61,11 @@ Always useful:
 
 Open `samples.md` when the rules alone leave the tone unclear.
 
+## Model
+
+Write under Jed's name with Sonnet or Opus. Smaller models invent details and miss the voice, so don't draft
+with them. If this session runs on one, say so and ask Jed to switch.
+
 ## Workflow
 
 Copy this checklist and tick it off.
@@ -71,7 +78,8 @@ Copy this checklist and tick it off.
 - [ ] 5. Fix every flag that isn't a deliberate choice. Fix the sentence, not just the word.
 - [ ] 6. Reread the ending of each paragraph. The checker cannot judge a flourish.
 - [ ] 7. Run the checker once more. Stop after two passes.
-- [ ] 8. Report in one line.
+- [ ] 8. Rewriting Jed's text? Run `--compare old new` and put back anything Jed wrote that was lost.
+- [ ] 9. Report in one line.
 ```
 
 Run the checker from this skill's folder. Use the base directory shown when the skill loads.
@@ -85,6 +93,10 @@ common failure in testing, so always pass it. For scripts add `--target-seconds 
 asked for). `--fix` prints the text with safe mechanical fixes only. The checker reads `.md`,
 `.txt`, `.docx`, `.pptx` and source files (comments only), or stdin with `-`. Add `--json` for
 machine output.
+
+`python3 scripts/ai_check.py --compare old.md new.md` scores both versions, lists the tells removed or
+added, and lists every number, quote, code span and name from the old text that the new one lost.
+Use it for every rewrite and polish.
 
 Report like this: "AI check: clean. No dashes, 11 words per sentence on average." Don't paste the full
 report unless Jed asks. If a finding is a deliberate choice, say so in a few words.

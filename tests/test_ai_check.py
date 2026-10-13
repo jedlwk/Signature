@@ -519,5 +519,37 @@ class PluginShape(unittest.TestCase):
             self.assertTrue((ROOT / rel).exists(), rel)
 
 
+class CompareTests(unittest.TestCase):
+    OLD = 'We shipped to 4,200 users in March. The lead said "keep it simple" and we used Zenith Labs. It serves as a robust tool.'
+
+    def run_compare(self, new):
+        with tempfile.TemporaryDirectory() as d:
+            a, b = Path(d, "old.md"), Path(d, "new.md")
+            a.write_text(self.OLD)
+            b.write_text(new)
+            return subprocess.run([sys.executable, str(SCRIPT), "--compare", str(a), str(b), "--no-calibration"],
+                                  capture_output=True, text=True)
+
+    def test_keeps_everything_and_drops_tells(self):
+        r = self.run_compare('We shipped to 4,200 users in March. The lead said "keep it simple" and we used Zenith Labs. It is a tool.')
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertIn("Tells removed", r.stdout)
+        self.assertIn("still there", r.stdout)
+
+    def test_reports_lost_items_and_exits_one(self):
+        r = self.run_compare("We shipped to 5,000 users. It is a tool.")
+        self.assertEqual(r.returncode, 1)
+        for lost in ("number: 4,200", "quote: keep it simple", "name: Zenith Labs"):
+            self.assertIn(lost, r.stdout)
+
+    def test_kept_missing_ignores_case_and_markup(self):
+        self.assertEqual(ai_check.kept_missing("See `run.py` and **Zenith**.", "See `run.py` and Zenith."), [])
+
+    def test_skill_names_sonnet_as_minimum(self):
+        text = (SKILL / "SKILL.md").read_text()
+        self.assertIn("Sonnet or Opus", text)
+        self.assertIn("--compare", text)
+
+
 if __name__ == "__main__":
     unittest.main()

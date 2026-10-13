@@ -108,6 +108,17 @@ a different one.
 
 **Output formats.** `--quiet` prints only the summary line. `--json` prints everything as JSON.
 
+**Compare a rewrite with the original.**
+
+```bash
+python3 skills/jed-writing-style/scripts/ai_check.py --compare old.md new.md
+```
+
+It prints both scores, the tells removed and added, and everything that was in the old text and is gone
+from the new: numbers, quoted words, `code` spans and names in the middle of a sentence. Each lost item
+is a question, not a verdict. Cut on purpose is fine. It exits 1 if anything was lost or the new score is
+still in the fix range.
+
 ## Reading the output
 
 Findings are ranked:

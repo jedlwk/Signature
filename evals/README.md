@@ -37,5 +37,5 @@ would check. Keep each line observable, so two people would score it the same wa
 
 ## Models
 
-Anthropic recommends testing on every model you plan to use. Run the scenarios on Haiku, Sonnet
-and Opus. Haiku needs enough guidance, and Opus should not be over-explained.
+Test on Sonnet and Opus. Sonnet is the minimum, so don't spend effort tuning for Haiku. Opus should not
+be over-explained.

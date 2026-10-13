@@ -35,7 +35,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import formats  # noqa: E402
 
-__version__ = "2.2.0"
+__version__ = "2.3.0"
 
 # ---------------------------------------------------------------------------
 # Thresholds. Each value has a reason so nobody has to guess what it means.
@@ -718,6 +718,77 @@ def load_calibration(path):
 # Output
 # ---------------------------------------------------------------------------
 
+QUOTED = re.compile(r'"([^"\n]{3,200})"|\u201c([^\u201d\n]{3,200})\u201d')
+CODE_SPAN = re.compile(r"`([^`\n]{2,80})`")
+PROPER = re.compile(r"(?<![.!?\n] )(?<!^)(?<=[a-z,;:] )([A-Z][a-zA-Z0-9]{2,}(?: [A-Z][a-zA-Z0-9]{2,})*)", re.M)
+
+
+def kept_items(text):
+    """What a rewrite must not lose: numbers, quoted words, `code` and mid-sentence names."""
+    text = strip_markup(text)
+    items = {}
+    for value, snip in number_values(text).items():
+        items.setdefault("number " + value, snip)
+    for m in QUOTED.finditer(text):
+        quote = (m.group(1) or m.group(2)).strip()
+        items.setdefault("quote " + quote.lower(), quote)
+    for m in CODE_SPAN.finditer(text):
+        items.setdefault("code " + m.group(1), m.group(1))
+    for m in PROPER.finditer(text):
+        items.setdefault("name " + m.group(1).lower(), m.group(1))
+    return items
+
+
+def kept_missing(original, rewrite):
+    """Items in the original that the rewrite no longer has. Returns [(kind, text)]."""
+    new_items = kept_items(rewrite)
+    new_text = strip_markup(rewrite).lower()
+    missing = []
+    for key, snip in kept_items(original).items():
+        kind = key.split(" ", 1)[0]
+        if key in new_items:
+            continue
+        if kind in ("quote", "name", "code") and snip.lower() in new_text:
+            continue
+        missing.append((kind, snip))
+    return missing
+
+
+def compare(old_raw, new_raw, register, suffix, calibration):
+    """Score both versions and list the tells removed, added, and original items lost."""
+    old = analyse(old_raw, register, suffix, calibration=calibration)
+    new = analyse(new_raw, register, suffix, calibration=calibration)
+
+    def counts(r):
+        c = {}
+        for f in r["findings"]:
+            c[f["label"]] = c.get(f["label"], 0) + 1
+        return c
+    a, b = counts(old), counts(new)
+    changes = sorted(((b.get(k, 0) - a.get(k, 0), k) for k in set(a) | set(b)))
+    return {"old": old, "new": new,
+            "removed": [(k, a.get(k, 0), b.get(k, 0)) for d, k in changes if d < 0],
+            "added": [(k, a.get(k, 0), b.get(k, 0)) for d, k in reversed(changes) if d > 0],
+            "lost": kept_missing(old_raw, new_raw)}
+
+
+def print_compare(c):
+    print("Before: %s" % _summary(c["old"]))
+    print("After:  %s" % _summary(c["new"]))
+    print("\nScore %.1f to %.1f." % (c["old"]["score"], c["new"]["score"]))
+    for title, rows in (("Tells removed", c["removed"]), ("Tells added", c["added"])):
+        if rows:
+            print("\n%s:" % title)
+            for label, was, now in rows:
+                print("  %s: %d to %d" % (label, was, now))
+    if c["lost"]:
+        print("\nLost from the original (check each one was cut on purpose):")
+        for kind, text in c["lost"]:
+            print("  %s: %s" % (kind, text))
+    else:
+        print("\nEvery number, quote, code span and name from the original is still there.")
+
+
 def summary_line(r):
     line = _summary(r)
     if r.get("spoken_seconds") is not None:
@@ -766,6 +837,7 @@ def main(argv=None):
     ap.add_argument("--facts", metavar="FILE", help="a file of the facts the draft is allowed to use. Numbers not in it are flagged")
     ap.add_argument("--facts-text", metavar="TEXT", help="the same, given inline")
     ap.add_argument("--target-seconds", type=int, metavar="N", help="for scripts: flag a spoken length that misses N seconds by more than 15 percent")
+    ap.add_argument("--compare", nargs=2, metavar=("OLD", "NEW"), help="score a draft before and after a rewrite, list the tells removed or added, and check the numbers, quotes and names you wrote survived")
     ap.add_argument("--fix", action="store_true", help="print the text with safe mechanical fixes applied")
     ap.add_argument("--in-place", action="store_true", help="with --fix, write the result back to the file")
     ap.add_argument("--baseline", metavar="DIR", help="measure a folder of your own writing and suggest thresholds")
@@ -800,6 +872,24 @@ def main(argv=None):
         else:
             print("\nAdd --save to keep these. Only measure writing you wrote yourself.")
         return 0
+    if args.compare:
+        try:
+            old_raw, new_raw = read_text(args.compare[0]), read_text(args.compare[1])
+        except (OSError, ValueError, zipfile.BadZipFile) as e:
+            print("ai_check: cannot read %s" % e, file=sys.stderr)
+            return 2
+        suffix = Path(args.compare[1]).suffix.lower()
+        register = args.register or ("code" if suffix in CODE_EXT else "general")
+        calibration = None
+        if not args.no_calibration and not os.environ.get("SIGNATURE_NO_CALIBRATION"):
+            calibration = load_calibration(args.calibration or CALIBRATION_PATH)
+        c = compare(old_raw, new_raw, register, suffix, calibration)
+        if args.json:
+            print(json.dumps({"old_score": c["old"]["score"], "new_score": c["new"]["score"],
+                              "removed": c["removed"], "added": c["added"], "lost": c["lost"]}, indent=2))
+        else:
+            print_compare(c)
+        return 1 if c["lost"] or c["new"]["score"] >= FIX_AT else 0
     if not args.file:
         ap.error("give a file to check, or - to read stdin")
 

@@ -144,7 +144,7 @@ and ran them again. On a 41 line rubric, plain Sonnet met 27 lines. With the ski
 36 to 40, Haiku from 28 to 36 and Opus from 38 to 41. The biggest wins were not inventing facts,
 hitting a script's length, and keeping my tone when polishing.
 
-Two honest limits. Haiku still invents details, so use Sonnet or Opus to write under my name. And these
+Two honest limits. Haiku still invents details, so Sonnet is the minimum model for writing under my name. And these
 are single runs scored by one reader, so treat the numbers as a direction. Results, caveats and raw
 outputs are in [evals/RESULTS.md](evals/RESULTS.md).
 
@@ -194,4 +194,4 @@ that clash with how I write. They are listed in `ai-tells.md`.
   Those parts are marked as likely in the references.
 - The checker finds patterns. It can't judge a flourish at the end of a paragraph, so endings get read by hand.
 - The facts check catches invented numbers. It cannot catch an invented anecdote, so read the draft.
-- Haiku still invents content. Use Sonnet or Opus to draft, and Haiku only for the checker and audits.
+- Sonnet is the minimum model. Haiku still invents content, so Signature isn't tuned for it.

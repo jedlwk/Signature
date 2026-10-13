@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.5.0
+
+Rewrites keep what Jed wrote, and Sonnet is the minimum model.
+
+- New `ai_check.py --compare OLD NEW`. It scores both versions, lists the tells removed and added, and
+  lists every number, quote, code span and name from the old text that the new one lost. It exits 1 if
+  something was lost.
+- New rule in `SKILL.md`: when rewriting Jed's own text, keep the examples, quotes, numbers and names Jed
+  wrote. The workflow checklist runs `--compare` after every rewrite.
+- New Model section in `SKILL.md`: write with Sonnet or Opus. Smaller models are no longer a target.
+
 ## 2.4.0
 
 Works in any session, and handles Word and PowerPoint when a session can't open them.

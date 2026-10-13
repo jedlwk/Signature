@@ -11,5 +11,7 @@ Polish mode. Polish this with the jed-writing-style skill: $ARGUMENTS
 3. Do not add facts, praise, sign-offs or new points. Do not formalise a casual message.
 4. Run `${CLAUDE_PLUGIN_ROOT}/skills/jed-writing-style/scripts/ai_check.py` on the result with the
    right register. Fix what it flags and run it once more.
+   Then run it with `--compare original polished` (save the original to a scratch file first). Put
+   back any number, quote or name from Jed's text that it says was lost, unless Jed asked to cut it.
 5. Show the polished text first. Then, in one or two lines, list what you changed and why. If the
    file is on disk, edit it in place only if Jed asked for that.
