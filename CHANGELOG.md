@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.7.0
+
+Three improvements from studying Emulate and Pangram.
+
+- **One verdict.** `ai_check.py --gate` prints PASS, REVIEW or FIX against the threshold table, so the bar is
+  enforced by a command and not only written down.
+- **Distance from Jed.** `--voice` compares a draft with the quoted samples in `references/samples.md` and
+  reports where it drifts: sentence length, short sentences, commas, first person and exclamation marks.
+  Emulate sells voice matching. This does it locally and measurably, for personal writing.
+- **A private history.** `--log` records each final check as numbers and tell names, never the text. `--history`
+  shows the trend and the tells that keep coming back, which feeds `/signature:learn`. Emulate keeps draft
+  history on its servers. This stays on the machine.
+- New eval scenario for rewriting without losing the author's own numbers, quotes and examples.
+
 ## 2.6.0
 
 A stated threshold for all of Jed's writing, informed by how Pangram works.

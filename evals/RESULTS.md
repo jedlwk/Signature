@@ -10,6 +10,7 @@ measurement.
 - What the runs showed
 - Plan and apply, end to end
 - Description routing test
+- Not yet scored
 - Caveats
 - Reproduce
 
@@ -111,6 +112,11 @@ load for 19 requests (`trigger-queries.json`). All 19 were right: 10 of 10 writi
 the skill, and 9 of 9 unrelated ones did not. The spreadsheet and PDF requests went to their own
 skills. This is one weak router on a small set, so add a query whenever the skill loads when it
 shouldn't or stays quiet when it should.
+
+## Not yet scored
+
+Scenario 8, `keep-my-examples`, was added in 2.7.0 and has not been run. The scores above are out of the original
+seven scenarios and 41 lines.
 
 ## Caveats
 

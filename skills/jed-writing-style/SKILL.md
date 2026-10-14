@@ -75,10 +75,10 @@ Copy this checklist and tick it off.
 - [ ] 1. Find the material and the mode. Open its reference.
 - [ ] 2. List the facts Jed gave you. Anything not on the list needs a placeholder or a question.
 - [ ] 3. Draft short. Jed usually cuts a normal first draft by half, so start there.
-- [ ] 4. Run the checker with the right register and the facts.
+- [ ] 4. Run the checker with the right register and the facts. Add `--gate`, and `--voice` for a post, message or course text.
 - [ ] 5. Fix every flag that isn't a deliberate choice. Fix the sentence, not just the word.
 - [ ] 6. Reread the ending of each paragraph. The checker cannot judge a flourish.
-- [ ] 7. Run the checker once more. Stop after two passes.
+- [ ] 7. Run the checker once more with `--gate --log`. Stop after two passes.
 - [ ] 8. Rewriting Jed's text? Run `--compare old new` and put back anything Jed wrote that was lost.
 - [ ] 9. Anything public (post, Medium, README)? Clear the threshold in references/detectors.md.
 - [ ] 10. Report in one line.
@@ -99,6 +99,10 @@ machine output.
 `python3 scripts/ai_check.py --compare old.md new.md` scores both versions, lists the tells removed or
 added, and lists every number, quote, code span and name from the old text that the new one lost.
 Use it for every rewrite and polish.
+
+`--gate` prints one PASS, REVIEW or FIX against the threshold in references/detectors.md. `--voice` compares the
+draft with Jed's own samples and says where it drifts. `--log` adds the run to a private local history
+(numbers and tell names only), and `--history` shows which tells keep coming back.
 
 Report like this: "AI check: clean. No dashes, 11 words per sentence on average." Don't paste the full
 report unless Jed asks. If a finding is a deliberate choice, say so in a few words.

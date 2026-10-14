@@ -23,6 +23,7 @@ This is a style linter, not an AI detector like GPTZero. It counts patterns Jed 
 past drafts and gives a rough score. A clean result means "nothing obvious", not "human".
 """
 import argparse
+import datetime
 import json
 import os
 import re
@@ -35,7 +36,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import formats  # noqa: E402
 
-__version__ = "2.4.0"
+__version__ = "2.5.0"
 
 # ---------------------------------------------------------------------------
 # Thresholds. Each value has a reason so nobody has to guess what it means.
@@ -825,6 +826,121 @@ def window_scores(raw, register, suffix, calibration=None):
     return out
 
 
+# ---------------------------------------------------------------------------
+# Voice distance, the gate, and a private history
+# ---------------------------------------------------------------------------
+
+SAMPLES_PATH = Path(__file__).resolve().parent.parent / "references" / "samples.md"
+HISTORY_PATH = Path(os.environ.get("SIGNATURE_HISTORY") or Path.home() / ".claude" / "signature" / "history.jsonl")
+PERSONAL = {"general", "post", "message", "course"}
+FIRST_PERSON = {"i", "my", "me", "i'm", "i've", "i'd", "we", "our", "us"}
+
+
+def _voice_numbers(text):
+    r = analyse(text, "general")
+    words = [w.lower() for w in WORD.findall(strip_markup(text))] or [""]
+    return {"mean_words": r["mean_words"], "short_share": r["short_share"],
+            "commas": r["commas_per_sentence"], "sentences": r["sentences"], "words": len(words),
+            "first_person": 100.0 * sum(1 for w in words if w in FIRST_PERSON) / len(words),
+            "exclaim": 100.0 * text.count("!") / len(words)}
+
+
+def voice_profile(path=SAMPLES_PATH):
+    """Measure Jed's own writing: the quoted samples in references/samples.md. None if it can't be read."""
+    try:
+        text = Path(path).read_text(encoding="utf8")
+    except OSError:
+        return None
+    quoted = "\n".join(l[2:] if l.startswith("> ") else "" for l in text.splitlines() if l.startswith(">"))
+    return _voice_numbers(quoted) if len(WORD.findall(quoted)) >= 150 else None
+
+
+def voice_check(raw, register, profile):
+    """Compare a draft with Jed's samples. Returns a list of (name, jed, draft, ok, note). Personal registers only."""
+    if not profile or register not in PERSONAL:
+        return []
+    d = _voice_numbers(strip_markup(raw))
+    if d["sentences"] < 4:
+        return []
+    rows = [
+        ("words per sentence", profile["mean_words"], d["mean_words"],
+         0.6 * profile["mean_words"] <= d["mean_words"] <= 1.4 * profile["mean_words"],
+         "Jed's runs about %.0f. Far longer reads stiff, far shorter reads clipped." % profile["mean_words"]),
+        ("short sentences", profile["short_share"] * 100, d["short_share"] * 100,
+         d["short_share"] >= 0.5 * profile["short_share"], "Jed mixes in short ones. Add a few."),
+        ("commas per sentence", profile["commas"], d["commas"], d["commas"] <= 1.0,
+         "Under one a sentence. Split the long ones."),
+    ]
+    if register in ("post", "message", "course"):
+        rows.append(("I, my, we per 100 words", profile["first_person"], d["first_person"],
+                     d["first_person"] >= 0.25 * profile["first_person"],
+                     "Jed writes from his own view. Say what you did or think."))
+        rows.append(("exclamation marks per 100 words", profile["exclaim"], d["exclaim"], d["exclaim"] <= 3 * max(profile["exclaim"], 1),
+                     "One burst of energy is Jed. A string of them is not."))
+    return rows
+
+
+def gate(result):
+    """One verdict against the threshold in references/detectors.md. Returns (verdict, reasons)."""
+    reasons, verdict = [], "PASS"
+    worst = result.get("worst_window", 0)
+    p0 = sum(1 for f in result["findings"] if f["tier"] == "P0")
+    hard = [f for f in result["findings"] if f["label"] in ("number not in facts", "spoken length")]
+    if result["score"] >= FIX_AT:
+        verdict = "FIX"
+        reasons.append("score %.1f is %.0f or more" % (result["score"], FIX_AT))
+    elif result["score"] >= CLEAN_BELOW:
+        verdict = "REVIEW"
+        reasons.append("score %.1f is between %.0f and %.0f" % (result["score"], CLEAN_BELOW, FIX_AT))
+    if worst >= FIX_AT:
+        verdict = "FIX"
+        reasons.append("one passage scores %.1f" % worst)
+    if hard:
+        verdict = "FIX"
+        reasons.append("%d invented number or length miss" % len(hard))
+    if p0 and verdict == "PASS":
+        verdict = "REVIEW"
+        reasons.append("%d P0 tell" % p0)
+    if not reasons:
+        reasons.append("score %.1f, worst passage %.1f, no P0 tells" % (result["score"], worst))
+    return verdict, reasons
+
+
+def log_run(result, register, path=None):
+    """Append a private record to the local history. It holds numbers and tell names, never the text."""
+    path = Path(path or HISTORY_PATH)
+    entry = {"at": datetime.datetime.now().isoformat(timespec="seconds"), "register": register,
+             "score": result["score"], "worst_window": result.get("worst_window", 0), "words": result["words"],
+             "tells": result.get("counts", {})}
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf8") as fh:
+            fh.write(json.dumps(entry) + "\n")
+    except OSError:
+        return False
+    return True
+
+
+def history_summary(path=None, last=30):
+    """Summarise recent checks: how the scores are moving and which tells keep coming back."""
+    path = Path(path or HISTORY_PATH)
+    try:
+        rows = [json.loads(l) for l in path.read_text(encoding="utf8").splitlines() if l.strip()][-last:]
+    except (OSError, ValueError):
+        return None
+    if not rows:
+        return None
+    half = len(rows) // 2 or 1
+    older, newer = rows[:half], rows[half:] or rows
+    totals = {}
+    for r in rows:
+        for k, v in r.get("tells", {}).items():
+            totals[k] = totals.get(k, 0) + v
+    avg = lambda rs: sum(r["score"] for r in rs) / len(rs)
+    return {"checks": len(rows), "average": round(avg(rows), 1), "older": round(avg(older), 1), "newer": round(avg(newer), 1),
+            "top": sorted(totals.items(), key=lambda kv: -kv[1])[:5], "since": rows[0]["at"][:10]}
+
+
 def summary_line(r):
     line = _summary(r)
     if r.get("spoken_seconds") is not None:
@@ -880,6 +996,10 @@ def main(argv=None):
     ap.add_argument("--facts-text", metavar="TEXT", help="the same, given inline")
     ap.add_argument("--target-seconds", type=int, metavar="N", help="for scripts: flag a spoken length that misses N seconds by more than 15 percent")
     ap.add_argument("--compare", nargs=2, metavar=("OLD", "NEW"), help="score a draft before and after a rewrite, list the tells removed or added, and check the numbers, quotes and names you wrote survived")
+    ap.add_argument("--gate", action="store_true", help="print one PASS, REVIEW or FIX verdict against the threshold in references/detectors.md")
+    ap.add_argument("--voice", action="store_true", help="compare the draft with Jed's own samples (personal registers: general, post, message, course)")
+    ap.add_argument("--log", action="store_true", help="add this check to your private history (numbers and tell names only, never the text)")
+    ap.add_argument("--history", action="store_true", help="show how your recent scores are moving and which tells keep coming back")
     ap.add_argument("--fix", action="store_true", help="print the text with safe mechanical fixes applied")
     ap.add_argument("--in-place", action="store_true", help="with --fix, write the result back to the file")
     ap.add_argument("--baseline", metavar="DIR", help="measure a folder of your own writing and suggest thresholds")
@@ -893,6 +1013,17 @@ def main(argv=None):
     if args.list_registers:
         for name in sorted(REGISTERS):
             print("%-9s %s" % (name, REGISTER_HELP[name]))
+        return 0
+    if args.history:
+        h = history_summary()
+        if not h:
+            print("No history yet. Add --log to a check to start one (%s)." % HISTORY_PATH)
+            return 0
+        print("%d checks since %s. Average score %.1f (older half %.1f, newer half %.1f)." % (h["checks"], h["since"], h["average"], h["older"], h["newer"]))
+        print("Tells that keep coming back:")
+        for label, n in h["top"]:
+            print("  %s: %d" % (label, n))
+        print("Take a repeating tell to /signature:learn if it should become a rule.")
         return 0
     if args.baseline:
         rows, suggestion = measure_folder(args.baseline)
@@ -976,13 +1107,35 @@ def main(argv=None):
     worst = max([w["score"] for w in result["windows"]] or [0])
     result["worst_window"] = worst
     if args.json:
+        if args.gate:
+            result["gate"] = dict(zip(("verdict", "reasons"), gate(result)))
+        if args.voice:
+            result["voice"] = [dict(zip(("name", "jed", "draft", "ok", "note"), r)) for r in voice_check(raw, register, voice_profile())]
         print(json.dumps(result, indent=2))
     else:
         if not args.quiet:
             print_report(result)
         print(summary_line(result))
+        if args.voice:
+            rows = voice_check(raw, register, voice_profile())
+            if not rows:
+                print("Voice: not compared (needs a personal register such as post, message or course, a draft of 4 or more sentences, and references/samples.md).")
+            else:
+                off = [r for r in rows if not r[3]]
+                print("Voice: %s." % ("close to Jed's samples" if not off else "drifting on %d of %d" % (len(off), len(rows))))
+                for name, jed, draft, ok, note in rows:
+                    print("  %s %s: Jed %.1f, draft %.1f.%s" % ("ok " if ok else "off", name, jed, draft, "" if ok else " " + note))
+                print("  (Measured on about 500 words of Jed's writing. Read it as a nudge.)")
         if worst >= FIX_AT and result["score"] < FIX_AT:
             print("A passage scores %.1f, so fix the hot spots even though the whole text is %s." % (worst, result["verdict"]))
+    if args.log:
+        log_run(result, register)
+    if args.gate:
+        verdict, reasons = gate(result)
+        if args.json:
+            return 1 if verdict == "FIX" else 0
+        print("Gate: %s. %s." % (verdict, ", ".join(reasons)))
+        return 1 if verdict == "FIX" else 0
     return 0 if result["score"] < FIX_AT and worst < FIX_AT else 1
 
 

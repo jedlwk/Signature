@@ -54,6 +54,10 @@ README, a portfolio) should clear every row. Internal notes and messages need on
 
 Short text under 50 words can't go to Pangram, so the checker alone decides.
 
+The checker rows are enforced by one command: `python3 scripts/ai_check.py FILE --register post --gate`.
+It prints PASS, REVIEW or FIX. For a post, message or course text add `--voice` as well, to see whether
+the draft still sounds like Jed's samples and not only whether it avoids tells.
+
 ## Checking with Pangram
 
 The free plan allows 20 text checks a day at pangram.com. Paste the finished text there and read the human

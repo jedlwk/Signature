@@ -91,6 +91,17 @@
         "Does not rewrite the passage unless asked, and the reply is the audit itself, not the original text",
         "The report is short and readable, not a dump of every match"
       ]
+    },
+    {
+      "id": "keep-my-examples",
+      "query": "Tighten this paragraph of mine for a README. Keep my examples: 'We ran it on 4,200 invoices in March and the lead said \"keep it simple\". It serves as a robust, comprehensive tool for Zenith Labs, leveraging `pandas` to seamlessly process them.'",
+      "files": [],
+      "expected_behavior": [
+        "Keeps 4,200, March, the quoted words keep it simple, Zenith Labs and `pandas`",
+        "Removes the tells (serves as, robust, comprehensive, leveraging, seamlessly) without adding a new fact",
+        "Runs ai_check.py --compare on the old and new text, or checks the same things by hand",
+        "Reports anything it chose to cut, and why"
+      ]
     }
   ],
   "version": 2

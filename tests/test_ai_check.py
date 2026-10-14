@@ -586,5 +586,63 @@ class WindowAndPangramTests(unittest.TestCase):
         self.assertIn("95%", (SKILL / "references" / "detectors.md").read_text())
 
 
+class GateVoiceHistoryTests(unittest.TestCase):
+    POST = ("I spent last Tuesday morning with over 30 HR leaders. I wanted them to answer the questions themselves.\n\n"
+            "So we ran it on their laptops, with no code. It was loud and it was fun!! My role is closing the gap.\n\n"
+            "It won't happen in one morning. But it adds up with every use case you try.")
+
+    def test_gate_pass_review_and_fix(self):
+        self.assertEqual(ai_check.gate(dict(ai_check.analyse(self.POST, "post"), worst_window=0))[0], "PASS")
+        bad = ai_check.analyse("We leverage a robust, seamless solution \u2014 truly a game-changer; it serves as a hub.", "post")
+        self.assertEqual(ai_check.gate(dict(bad, worst_window=0))[0], "FIX")
+        invented = ai_check.analyse("We saw 9,999 users sign up on the day.", "post", facts="30 users")
+        self.assertEqual(ai_check.gate(dict(invented, worst_window=0))[0], "FIX")
+
+    def test_voice_close_and_drifting(self):
+        profile = ai_check.voice_profile()
+        self.assertIsNotNone(profile)
+        self.assertEqual([r for r in ai_check.voice_check(self.POST, "post", profile) if not r[3]], [])
+        stiff = " ".join(["The organisation facilitates the implementation of strategic initiatives across multiple "
+                          "business units, which in turn enables stakeholders to realise value, mitigate risk and align on outcomes."] * 5)
+        off = [r[0] for r in ai_check.voice_check(stiff, "post", profile) if not r[3]]
+        self.assertIn("words per sentence", off)
+        self.assertEqual(ai_check.voice_check(stiff, "doc", profile), [])
+
+    def test_log_and_history_keep_no_text(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d, "h.jsonl")
+            r = dict(ai_check.analyse("We leverage robust tools.", "post"), worst_window=0)
+            self.assertTrue(ai_check.log_run(r, "post", path))
+            self.assertTrue(ai_check.log_run(r, "post", path))
+            self.assertNotIn("leverage robust", path.read_text())
+            h = ai_check.history_summary(path)
+            self.assertEqual(h["checks"], 2)
+            self.assertTrue(h["top"])
+
+    def test_cli_gate_and_history(self):
+        with tempfile.TemporaryDirectory() as d:
+            f, hist = Path(d, "p.md"), Path(d, "h.jsonl")
+            f.write_text(self.POST)
+            env = dict(os.environ, SIGNATURE_HISTORY=str(hist))
+            r = subprocess.run([sys.executable, str(SCRIPT), str(f), "--register", "post", "--gate", "--voice", "--log", "--quiet"],
+                               capture_output=True, text=True, env=env)
+            self.assertEqual(r.returncode, 0, r.stdout)
+            self.assertIn("Gate: PASS", r.stdout)
+            self.assertIn("Voice:", r.stdout)
+            r = subprocess.run([sys.executable, str(SCRIPT), "--history"], capture_output=True, text=True, env=env)
+            self.assertIn("1 checks", r.stdout)
+
+
+class EvalScoringTests(unittest.TestCase):
+    def test_saved_sonnet_run_stays_clean(self):
+        """A threshold change that makes the recorded good outputs fail is a regression."""
+        r = subprocess.run([sys.executable, str(ROOT / "evals" / "score.py"), str(ROOT / "evals" / "runs" / "run-2" / "sonnet")],
+                           capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        rows = {l.split()[1]: float(l.split()[3]) for l in r.stdout.splitlines()[1:] if len(l.split()) > 3}
+        for name in ("linkedin-post", "customer-answer", "speaker-script", "code-comment"):
+            self.assertLess(rows[name], ai_check.CLEAN_BELOW + 0.5, name)
+
+
 if __name__ == "__main__":
     unittest.main()

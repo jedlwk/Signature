@@ -131,11 +131,13 @@ python3 skills/jed-writing-style/scripts/ai_check.py draft.md --register doc
 ```
 
 A register is the type of material (`doc`, `script`, `slides`, `post` and so on). It needs only
-Python 3. It can also check numbers against the facts you gave it and measure a script's spoken
-length. It can apply safe fixes too, and calibrate on your own writing. Every option is in
+Python 3. It can also check numbers against the facts you gave it, measure a script's spoken
+length, give one PASS, REVIEW or FIX verdict, and say how far a draft drifts from my own samples. Every option is in
 [docs/checker.md](docs/checker.md).
 
-It is a style linter, not an AI detector like GPTZero. A clean score means nothing obvious is left.
+It is a style linter, not an AI detector like Pangram or GPTZero. A clean score means nothing obvious is left.
+The bar for anything public, including an optional Pangram check, is in
+[references/detectors.md](skills/jed-writing-style/references/detectors.md).
 
 ## How well it works
 

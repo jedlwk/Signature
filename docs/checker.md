@@ -128,6 +128,19 @@ the exit code 1 even when the whole text is under 3. Details and the full thresh
 applies the 95% and 90% human-share rule. It sends the text off this computer, so it needs `--send`, a
 `PANGRAM_API_KEY` in the environment and `pip install pangram-sdk`. Never use it on confidential text.
 
+**One verdict.** `--gate` prints PASS, REVIEW or FIX against the threshold table in
+`references/detectors.md`. FIX means a score of 3 or more, a passage of 3 or more, an invented number or a missed
+script length. REVIEW means a score from 1 to 3 or a P0 tell. It exits 1 only on FIX.
+
+**Distance from Jed.** `--voice` compares a draft with the quoted writing in `references/samples.md`: words per
+sentence, short sentences, commas, and for posts, messages and course text, how often it says "I" and how many
+exclamation marks it uses. It re-measures whenever a sample is added. About 500 words is a small base, so read
+it as a nudge. Documents and slides legitimately differ from a post, so it skips them.
+
+**A private history.** `--log` adds a line to `~/.claude/signature/history.jsonl` with the date, register,
+scores and tell names. It never stores the text. `--history` shows whether scores are moving down and which
+tells keep coming back, which is what `/signature:learn` should turn into a rule.
+
 ## Reading the output
 
 Findings are ranked:
