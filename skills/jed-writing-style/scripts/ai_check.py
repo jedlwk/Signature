@@ -35,7 +35,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import formats  # noqa: E402
 
-__version__ = "2.3.0"
+__version__ = "2.4.0"
 
 # ---------------------------------------------------------------------------
 # Thresholds. Each value has a reason so nobody has to guess what it means.
@@ -610,7 +610,7 @@ def analyse(raw, register="general", suffix="", facts=None, target_seconds=None,
         "findings": sorted(findings, key=lambda f: (TIER_ORDER[f["tier"]], f["label"], f["line"])),
         "rhythm": rhythm, "not_x_allowed": n_not_x == 1,
         "spoken_words": spoken_words, "spoken_seconds": None if spoken_seconds is None else round(spoken_seconds),
-        "calibrated": bool(calibration),
+        "calibrated": bool(calibration), "counts": counts,
     }
 
 
@@ -789,6 +789,42 @@ def print_compare(c):
         print("\nEvery number, quote, code span and name from the original is still there.")
 
 
+WINDOW_WORDS = 120
+WINDOW_MIN_TOTAL = 250
+
+
+def window_scores(raw, register, suffix, calibration=None):
+    """Score the text in runs of paragraphs of about 120 words, so one machine-sounding passage can't hide.
+
+    Detectors such as Pangram also read in windows and report where the AI text sits, not only a
+    document verdict. Returns [] for source files and for texts under 250 words.
+    """
+    if suffix in CODE_EXT:
+        return []
+    paras = [(m.start(), m.group(0)) for m in re.finditer(r"\S[^\n]*(?:\n(?!\s*\n)[^\n]*)*", raw)]
+    if len(WORD.findall(strip_markup(raw))) < WINDOW_MIN_TOTAL:
+        return []
+    groups, cur, cur_words = [], [], 0
+    for start, para in paras:
+        cur.append((start, para))
+        cur_words += len(WORD.findall(para))
+        if cur_words >= WINDOW_WORDS:
+            groups.append(cur)
+            cur, cur_words = [], 0
+    if cur:
+        if groups and cur_words < WINDOW_WORDS // 2:
+            groups[-1].extend(cur)
+        else:
+            groups.append(cur)
+    out = []
+    for g in groups:
+        text = "\n\n".join(p for _, p in g)
+        r = analyse(text, register, suffix, calibration=calibration)
+        out.append({"line": line_of(raw, g[0][0]), "words": r["words"], "score": r["score"],
+                    "top": sorted(r["counts"] if "counts" in r else {}, key=lambda k: -r["counts"][k])[:3]})
+    return out
+
+
 def summary_line(r):
     line = _summary(r)
     if r.get("spoken_seconds") is not None:
@@ -820,6 +856,12 @@ def print_report(r):
         print("  line %s: ...%s..." % (f["line"] or "-", f["snippet"]))
     if r["not_x_allowed"]:
         print("\n  (one 'not X but Y' is allowed if it is the actual point)")
+    hot = [w for w in r.get("windows", []) if w["score"] >= FIX_AT]
+    if hot:
+        print("\n=== hot spots (passages that read AI even if the whole text doesn't)")
+        for w in hot:
+            print("  from line %d, %d words, score %.1f%s" % (w["line"], w["words"], w["score"],
+                  (": " + ", ".join(w["top"])) if w["top"] else ""))
     if r["rhythm"]:
         print("\n=== rhythm")
         for line in r["rhythm"]:
@@ -930,13 +972,18 @@ def main(argv=None):
     result = analyse(raw, register, suffix, facts=facts or None, target_seconds=args.target_seconds, calibration=calibration,
                      strings=args.strings)
 
+    result["windows"] = window_scores(raw, register, suffix, calibration)
+    worst = max([w["score"] for w in result["windows"]] or [0])
+    result["worst_window"] = worst
     if args.json:
         print(json.dumps(result, indent=2))
     else:
         if not args.quiet:
             print_report(result)
         print(summary_line(result))
-    return 0 if result["score"] < FIX_AT else 1
+        if worst >= FIX_AT and result["score"] < FIX_AT:
+            print("A passage scores %.1f, so fix the hot spots even though the whole text is %s." % (worst, result["verdict"]))
+    return 0 if result["score"] < FIX_AT and worst < FIX_AT else 1
 
 
 if __name__ == "__main__":

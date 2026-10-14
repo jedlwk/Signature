@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.6.0
+
+A stated threshold for all of Jed's writing, informed by how Pangram works.
+
+- New `references/detectors.md`: what Pangram does and where it is weak, what to take from it, and one
+  threshold table. Checker score under 1 overall and under 3 in every passage. If Pangram is used, 95% human
+  or more, with 90% to 95% as review.
+- `ai_check.py` scores text of 250 words or more in windows of about 120 words and lists hot spots. A hot
+  spot makes the exit code 1.
+- New optional `scripts/pangram_check.py`. It needs `--send`, a `PANGRAM_API_KEY` in the environment and
+  `pangram-sdk`, and refuses text under 50 words. It has not been run against the live service.
+- Says plainly that humanizers and synonym swaps are not the fix, and that a course's AI policy comes first.
+
 ## 2.5.0
 
 Rewrites keep what Jed wrote, and Sonnet is the minimum model.

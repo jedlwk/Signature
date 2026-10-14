@@ -119,6 +119,15 @@ from the new: numbers, quoted words, `code` spans and names in the middle of a s
 is a question, not a verdict. Cut on purpose is fine. It exits 1 if anything was lost or the new score is
 still in the fix range.
 
+**Hot spots.** For text of 250 words or more, the checker also scores runs of about 120 words and lists any
+that score 3 or more, because one machine-sounding passage can hide in a clean document. A hot spot makes
+the exit code 1 even when the whole text is under 3. Details and the full threshold table are in
+`skills/jed-writing-style/references/detectors.md`.
+
+**An optional external check.** `scripts/pangram_check.py FILE --send` asks Pangram how it scores the text and
+applies the 95% and 90% human-share rule. It sends the text off this computer, so it needs `--send`, a
+`PANGRAM_API_KEY` in the environment and `pip install pangram-sdk`. Never use it on confidential text.
+
 ## Reading the output
 
 Findings are ranked:

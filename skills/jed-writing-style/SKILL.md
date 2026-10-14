@@ -56,6 +56,7 @@ Always useful:
 
 - [references/voice.md](references/voice.md) for the full voice, word choices and registers
 - [references/ai-tells.md](references/ai-tells.md) for every tell, ranked P0, P1 and P2
+- [references/detectors.md](references/detectors.md) for the AI-detector threshold (Pangram) and what to do when a text fails
 - [references/examples.md](references/examples.md) for before and after pairs and one worked run
 - [references/samples.md](references/samples.md) for real writing to match by ear
 
@@ -79,7 +80,8 @@ Copy this checklist and tick it off.
 - [ ] 6. Reread the ending of each paragraph. The checker cannot judge a flourish.
 - [ ] 7. Run the checker once more. Stop after two passes.
 - [ ] 8. Rewriting Jed's text? Run `--compare old new` and put back anything Jed wrote that was lost.
-- [ ] 9. Report in one line.
+- [ ] 9. Anything public (post, Medium, README)? Clear the threshold in references/detectors.md.
+- [ ] 10. Report in one line.
 ```
 
 Run the checker from this skill's folder. Use the base directory shown when the skill loads.

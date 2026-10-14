@@ -551,5 +551,40 @@ class CompareTests(unittest.TestCase):
         self.assertIn("--compare", text)
 
 
+class WindowAndPangramTests(unittest.TestCase):
+    def test_hot_spot_is_found_in_a_clean_document(self):
+        human = "I opened the file at nine and the log was empty. The job had run twice, which was odd. So I checked cron.\n\n"
+        other = "We reran it with a new path and it worked. Then I wrote down the steps for the next person.\n\n"
+        ai = ("In today's fast-paced landscape, it is crucial to leverage robust, seamless solutions that foster "
+              "comprehensive synergy. Moreover, this holistic approach serves as a testament to innovation and delves "
+              "into the tapestry of modern workflows.\n\n")
+        text = (human + other) * 6 + ai + (other + human) * 4
+        w = ai_check.window_scores(text, "general", "")
+        self.assertTrue(w)
+        self.assertGreaterEqual(max(x["score"] for x in w), ai_check.FIX_AT)
+
+    def test_short_text_and_code_have_no_windows(self):
+        self.assertEqual(ai_check.window_scores("Short text here.", "general", ""), [])
+        self.assertEqual(ai_check.window_scores("# " + "word " * 400, "code", ".py"), [])
+
+    def test_pangram_gate(self):
+        sys.path.insert(0, str(SKILL / "scripts"))
+        import pangram_check
+        self.assertEqual(pangram_check.gate({"fraction_human": 0.97, "fraction_ai": 0, "fraction_ai_assisted": 0.03})[0], "pass")
+        self.assertEqual(pangram_check.gate({"fraction_human": 0.92})[0], "review")
+        self.assertEqual(pangram_check.gate({"fraction_human": 0.5, "fraction_ai": 0.5})[0], "fail")
+        self.assertEqual(pangram_check.gate({"fraction_human": 0.99, "windows": [{"label": "AI-Generated"}]})[0], "review")
+
+    def test_pangram_script_refuses_without_send_and_key(self):
+        r = subprocess.run([sys.executable, str(SKILL / "scripts" / "pangram_check.py"), str(SCRIPT)],
+                           capture_output=True, text=True, env={k: v for k, v in os.environ.items() if k != "PANGRAM_API_KEY"})
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("--send", r.stderr)
+
+    def test_detectors_page_is_linked_and_states_the_threshold(self):
+        self.assertIn("references/detectors.md", (SKILL / "SKILL.md").read_text())
+        self.assertIn("95%", (SKILL / "references" / "detectors.md").read_text())
+
+
 if __name__ == "__main__":
     unittest.main()
