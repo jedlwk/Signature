@@ -1,0 +1,10 @@
+{
+  "name": "",
+  "samples": "samples.md",
+  "checker": {},
+  "notes": {
+    "checker": "Empty on purpose. The checker flags general AI tells only. Add flags, comma limits and words you strike out as you learn your own habits. docs/profiles.md lists every setting."
+  },
+  "messages": {},
+  "reminder": "Writing rule for this session: anything written under the user's name follows the jed-writing-style skill and its active profile. Load it and read the profile's rules.md before drafting. Use only the facts the user gave: no invented numbers, anecdotes or advice. Run the skill's scripts/ai_check.py on finished drafts. Local project rules (CLAUDE.md, rubrics, repo conventions) win where they differ."
+}

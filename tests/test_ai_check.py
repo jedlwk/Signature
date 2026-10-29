@@ -6,6 +6,7 @@ Run from the repo root:
 """
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -18,6 +19,7 @@ SKILL = ROOT / "skills" / "jed-writing-style"
 SCRIPT = SKILL / "scripts" / "ai_check.py"
 FIXTURES = ROOT / "tests" / "fixtures"
 sys.path.insert(0, str(SKILL / "scripts"))
+os.environ.setdefault("SIGNATURE_PROFILE", "jed")  # a private profile on this machine must not change results
 
 import ai_check  # noqa: E402
 
@@ -408,11 +410,75 @@ class Calibration(unittest.TestCase):
         self.assertIn("mean_cap", p.stdout)
 
 
+class Profiles(unittest.TestCase):
+    """Jed's taste lives in profiles/jed. The engine alone flags general AI tells only."""
+
+    TEXT = "We delve into the psychosocial side — it's “new”; really new. Great result!"
+
+    def tearDown(self):
+        ai_check.use_profile("jed")
+
+    def test_jed_and_starter_differ_only_on_taste(self):
+        jed = labels(run(self.TEXT, "course"))
+        self.assertTrue({"dash", "semicolon", "curly quotes", "exclamation", "banned word"} <= jed)
+        ai_check.use_profile("starter")
+        starter = run(self.TEXT, "course")
+        self.assertEqual(labels(starter), {"banned word"})
+        self.assertEqual([f["advice"] for f in starter["findings"]], ["'delve' reads as generated. Say it plainly."])
+        self.assertIn("exclamation", labels(run("It works!", "doc")))
+
+    def test_messages_come_from_the_profile(self):
+        anecdote = "I once saw this work."
+        self.assertIn("Jed did not give", run(anecdote)["findings"][0]["advice"])
+        ai_check.use_profile("starter")
+        self.assertIn("you did not give", run(anecdote)["findings"][0]["advice"])
+
+    def test_starter_has_no_voice_yet(self):
+        ai_check.use_profile("starter")
+        self.assertIsNone(ai_check.voice_profile())
+        self.assertEqual(ai_check.PROFILE.name, "")
+
+    def test_lookup_order(self):
+        with tempfile.TemporaryDirectory() as d:
+            mine = Path(d, "profile")
+            shutil.copytree(ai_check.PROFILES_DIR / "starter", mine)
+            saved_user, saved_env = ai_check.USER_PROFILE, os.environ.pop("SIGNATURE_PROFILE", None)
+            try:
+                ai_check.USER_PROFILE = Path(d, "none")
+                self.assertEqual(ai_check.find_profile(), ai_check.PROFILES_DIR / "jed")
+                ai_check.USER_PROFILE = mine
+                self.assertEqual(ai_check.find_profile(), mine)
+                os.environ["SIGNATURE_PROFILE"] = "jed"
+                self.assertEqual(ai_check.find_profile(), ai_check.PROFILES_DIR / "jed")
+                self.assertEqual(ai_check.find_profile(str(mine)), mine)
+            finally:
+                ai_check.USER_PROFILE = saved_user
+                os.environ["SIGNATURE_PROFILE"] = saved_env or "jed"
+
+    def test_cli_profile_flags(self):
+        p = subprocess.run([sys.executable, str(SCRIPT), "--which-profile"], capture_output=True, text=True)
+        self.assertEqual(p.stdout.split("\t"), [str(ai_check.PROFILES_DIR / "jed"), "Jed\n"])
+        p = subprocess.run([sys.executable, str(SCRIPT), "-", "--profile", "starter", "--json"], input=self.TEXT,
+                           capture_output=True, text=True)
+        self.assertEqual({f["label"] for f in json.loads(p.stdout)["findings"]}, {"banned word"})
+        p = subprocess.run([sys.executable, str(SCRIPT), "-", "--profile", "/no/such/profile"], input="Hi.",
+                           capture_output=True, text=True)
+        self.assertEqual(p.returncode, 2)
+        self.assertIn("cannot read", p.stderr)
+
+    def test_bad_env_profile_falls_back_to_jed(self):
+        env = dict(os.environ, SIGNATURE_PROFILE="/no/such/profile")
+        p = subprocess.run([sys.executable, str(SCRIPT), "--which-profile"], capture_output=True, text=True, env=env)
+        self.assertIn("Using the bundled jed profile", p.stderr)
+        self.assertTrue(p.stdout.startswith(str(ai_check.PROFILES_DIR / "jed")))
+
+
 class DocsPracticeWhatTheyPreach(unittest.TestCase):
     """The skill's own files must pass the checker, like the repo it learned from does."""
 
     def test_docs(self):
-        files = [ROOT / "README.md", ROOT / "CHANGELOG.md", ROOT / "docs" / "checker.md", ROOT / "docs" / "restyle.md", SKILL / "SKILL.md"] + sorted((SKILL / "references").glob("*.md"))
+        files = [ROOT / "README.md", ROOT / "CHANGELOG.md", ROOT / "docs" / "checker.md", ROOT / "docs" / "restyle.md", ROOT / "docs" / "profiles.md",
+                 SKILL / "SKILL.md"] + sorted((SKILL / "references").glob("*.md")) + sorted((SKILL / "profiles").glob("*/*.md"))
         for path in files:
             register = "post" if path.name == "posts-and-messages.md" else "doc"
             with self.subTest(path.name):
@@ -497,6 +563,10 @@ class PluginShape(unittest.TestCase):
         payload = json.loads(out.stdout)["hookSpecificOutput"]
         self.assertEqual(payload["hookEventName"], "SessionStart")
         self.assertLess(len(payload["additionalContext"]), 1200)
+        self.assertEqual(payload["additionalContext"], self.load("skills/jed-writing-style/profiles/jed/profile.json")["reminder"])
+        env = dict(os.environ, SIGNATURE_PROFILE="starter")
+        out = subprocess.run([sys.executable, str(script)], capture_output=True, text=True, env=env)
+        self.assertNotIn("Jed", json.loads(out.stdout)["hookSpecificOutput"]["additionalContext"])
 
     def test_commands_have_a_description_and_use_the_plugin_root(self):
         commands = sorted((ROOT / "commands").glob("*.md"))
@@ -519,7 +589,8 @@ class PluginShape(unittest.TestCase):
     def test_relative_links_resolve(self):
         import re
         pages = [ROOT / "README.md", ROOT / "CHANGELOG.md", ROOT / "docs" / "checker.md", ROOT / "docs" / "restyle.md", ROOT / "docs" / "develop.md", ROOT / "docs" / "anywhere.md", ROOT / "evals" / "README.md",
-                 ROOT / "evals" / "RESULTS.md", SKILL / "SKILL.md"] + sorted((SKILL / "references").glob("*.md"))
+                 ROOT / "evals" / "RESULTS.md", ROOT / "docs" / "profiles.md", SKILL / "SKILL.md"] + sorted((SKILL / "references").glob("*.md")) \
+            + sorted((SKILL / "profiles").glob("*/*.md"))
         for page in pages:
             for target in re.findall(r"\]\((?!https?:|mailto:|#)([^)#\s]+)", page.read_text()):
                 with self.subTest("%s -> %s" % (page.name, target)):

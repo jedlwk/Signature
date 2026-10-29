@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.9.0
+
+The voice moves into a profile, so the engine works for anyone. Nothing changes for me.
+
+- **`profiles/jed/`** holds my rules (the quick card, moved out of `SKILL.md`), `voice.md`, `samples.md`,
+  `examples.md` and a `profile.json` with the checker's settings: which habits to flag, comma limits,
+  where exclamation marks are fine, my extra banned words and the checker's wording.
+- **The engine's defaults are neutral.** Without a profile it flags general AI tells only. Dashes,
+  semicolons, curly quotes and emojis are each one setting in `profile.json`.
+- **`profiles/starter/`** is a blank profile to copy. [docs/profiles.md](docs/profiles.md) explains it.
+- **Choosing one.** `--profile`, then `SIGNATURE_PROFILE`, then `~/.claude/signature/profile/`, then the
+  bundled default, which is mine for now. `--which-profile` prints the one in use.
+- **The session reminder** comes from the profile, and so does the name in `plan_scan.py`.
+- **A snapshot test** records what the checker says about 116 texts under every register. It was committed
+  before the refactor, and every answer is still the same.
+
 ## 2.8.0
 
 Three fixes from testing the checker on Jed's own writing. Claude wrote 39 drafts as Jed from the same briefs as

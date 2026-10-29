@@ -5,29 +5,18 @@ description: Applies Jed's writing voice and anti-AI rules to anything written u
 
 # Write like Jed
 
-Plain, warm and direct. Read this page first. Then open the one reference file for the material in
-hand. If a CLAUDE.md, rubric, template or repo convention says something different, it wins. Keep
-the rest of this guide.
+Plain, warm and direct. Read this page first, then the profile's rules. Then open the one reference
+file for the material in hand. If a CLAUDE.md, rubric, template or repo convention says something
+different, it wins. Keep the rest of this guide.
 
-## Quick card
+## The profile
 
-1. Point first. Answer in the first sentence.
-2. Short sentences, plain words. Mean 13 words, a third under 8, none over 30.
-3. Under one comma per sentence. Never more than two in one.
-4. No dashes as punctuation: no em dash, en dash, spaced hyphen or double hyphen. Use a full stop, a
-   comma, a colon or brackets.
-5. No semicolons, no emojis, straight quotes, sentence case headings, bold only for labels.
-6. Plain verbs. "is" not "serves as". "use" not "leverage". "to" not "in order to". <!-- signature:ignore-line -->
-7. No LLM words, tidy groups of three, "not X but Y" templates, counted preambles, throat-clearing,
-   closing summaries, slogans or hollow praise.
-8. Warm, never gushing. Confident from knowing. Hedge once, only where the evidence is weak.
-9. Fair to every tool and team named. No hype.
-10. Use only the facts you were given. Never invent a number, quote, name, example, anecdote or
-    claim. If one is missing, use a placeholder like [number] or ask.
-11. When rewriting Jed's own text, keep the examples, quotes, numbers and names Jed wrote. Cut or
-    change one only if Jed asked.
-12. End on the fact, the next step or a real question. Never a flourish.
-13. British and Singapore spelling.
+Jed's own voice lives in one profile folder: these rules, the voice, real samples, before and after
+pairs, and the checker's settings. The default is [profiles/jed/](profiles/jed/). Check which one is
+active with `python3 scripts/ai_check.py --which-profile`.
+
+Read the profile's [rules.md](profiles/jed/rules.md) now, before drafting. It is the quick card, and
+everything below assumes it.
 
 ## Pick a mode
 
@@ -54,11 +43,11 @@ the rest of this guide.
 
 Always useful:
 
-- [references/voice.md](references/voice.md) for the full voice, word choices and registers
+- the profile's [voice.md](profiles/jed/voice.md) for the full voice, word choices and registers
 - [references/ai-tells.md](references/ai-tells.md) for every tell, ranked P0, P1 and P2
 - [references/detectors.md](references/detectors.md) for the AI-detector threshold (Pangram) and what to do when a text fails
-- [references/examples.md](references/examples.md) for before and after pairs and one worked run
-- [references/samples.md](references/samples.md) for real writing to match by ear
+- the profile's [examples.md](profiles/jed/examples.md) for before and after pairs and one worked run
+- the profile's [samples.md](profiles/jed/samples.md) for real writing to match by ear
 
 Open `samples.md` when the rules alone leave the tone unclear.
 
@@ -72,7 +61,7 @@ with them. If this session runs on one, say so and ask Jed to switch.
 Copy this checklist and tick it off.
 
 ```
-- [ ] 1. Find the material and the mode. Open its reference.
+- [ ] 1. Read the profile's rules.md. Find the material and the mode. Open its reference.
 - [ ] 2. List the facts Jed gave you. Anything not on the list needs a placeholder or a question.
 - [ ] 3. Draft short. Jed usually cuts a normal first draft by half, so start there.
 - [ ] 4. Run the checker with the right register and the facts. Add `--gate`, and `--voice` for a post, message, peer reply or course text.

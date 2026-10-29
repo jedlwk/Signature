@@ -174,9 +174,9 @@ tests cover are in [docs/develop.md](docs/develop.md).
 
 ## Make it yours
 
-Fork the repo, then replace `references/voice.md` and `references/samples.md` with your own rules and
-writing. Adjust the mechanics in `SKILL.md`, rename the skill, and run the tests. The checker and the
-structure work for anyone. The voice is mine, so it will sound off on someone else's work until you do.
+Copy `skills/jed-writing-style/profiles/starter/` to `~/.claude/signature/profile/` and fill in your own
+rules, voice and writing. [docs/profiles.md](docs/profiles.md) has the details. The checker works for
+anyone. The voice in `profiles/jed/` is mine, so it will sound off on your work until you do.
 
 ## Where it came from
 

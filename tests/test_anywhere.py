@@ -20,6 +20,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SKILL = ROOT / "skills" / "jed-writing-style"
 VERIFY = SKILL / "scripts" / "verify_office.py"
 sys.path.insert(0, str(SKILL / "scripts"))
+os.environ.setdefault("SIGNATURE_PROFILE", "jed")  # a private profile on this machine must not change results
 sys.path.insert(0, str(ROOT / "tests"))
 
 import apply_edits  # noqa: E402

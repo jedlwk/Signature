@@ -6,6 +6,7 @@ Run from the repo root:
 """
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -17,6 +18,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SKILL = ROOT / "skills" / "jed-writing-style"
 SCRIPT = SKILL / "scripts" / "plan_scan.py"
 sys.path.insert(0, str(SKILL / "scripts"))
+os.environ.setdefault("SIGNATURE_PROFILE", "jed")  # a private profile on this machine must not change results
 
 import plan_scan  # noqa: E402
 

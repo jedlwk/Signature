@@ -2,19 +2,22 @@
 """Start every session with a short reminder to use the jed-writing-style skill.
 
 A skill only loads when Claude decides it is relevant. This reminder makes that decision
-automatic for anything written under Jed's name. It adds one short paragraph of context,
-touches no files and makes no network calls.
+automatic for anything written under the writer's name. The text comes from the active profile's
+"reminder", so each writer's own rules are the ones repeated. It adds one short paragraph of
+context, touches no files and makes no network calls.
 """
 import json
+import sys
+from pathlib import Path
 
-REMINDER = (
-    "Writing rule for this session: anything written under Jed's name (code comments, commit messages, "
-    "READMEs, docs, slides, scripts, posts, messages, assignments) follows the jed-writing-style skill. "
-    "Load it before drafting. Core rules: warm and plain, point first, no em or en dashes, under one comma "
-    "per sentence, no semicolons, no LLM words or tidy groups of three. Use only the facts Jed gave you: "
-    "no invented numbers, anecdotes or advice. Run the skill's scripts/ai_check.py (with --facts-text, and "
-    "--target-seconds for scripts) on finished drafts. Local project rules (CLAUDE.md, rubrics, repo "
-    "conventions) win where they differ."
-)
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "skills" / "jed-writing-style" / "scripts"))
 
-print(json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": REMINDER}}))
+try:
+    import ai_check
+    reminder = ai_check.PROFILE.reminder
+except Exception:  # a broken install must never block a session from starting
+    reminder = ("Writing rule for this session: anything written under the user's name follows the "
+                "jed-writing-style skill. Load it before drafting, and run its scripts/ai_check.py on finished drafts.")
+
+if reminder:
+    print(json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": reminder}}))

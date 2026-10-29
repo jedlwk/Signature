@@ -13,12 +13,13 @@ every edit.
 2. Compare them. List what Jed changed, then name the pattern in one line. Examples: "cut the closing
    summary", "swapped a formal word for a plain one", "removed a dash".
 3. Check whether the guide already covers it. Read the matching file in the jed-writing-style
-   `references/` folder. If it is covered, say so. A repeated correction means the rule is
-   too weak or too buried, so propose making it stronger or moving it up.
+   `references/` folder or in the active profile (`ai_check.py --which-profile` prints its folder).
+   If it is covered, say so. A repeated correction means the rule is too weak or too buried, so
+   propose making it stronger or moving it up.
 4. Propose the change. Give the exact text and the target file. Choose one:
    - a new rule or a stronger rule
-   - a new before and after pair for `examples.md`
-   - a new sample for `samples.md`, if the after text is writing Jed is happy with
+   - a new before and after pair for the profile's `examples.md`
+   - a new sample for the profile's `samples.md`, if the after text is writing Jed is happy with
 5. Ask before writing anything. Do not edit the guide without a yes.
 6. On a yes, append a short entry to the private log, and never to the public repo. Use
    `$CLAUDE_PLUGIN_DATA/corrections.md` if that variable is set, otherwise `~/.claude/signature/corrections.md`.

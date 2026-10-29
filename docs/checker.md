@@ -95,6 +95,10 @@ that", "utilise" and a few more. It leaves code, links and ignored passages alon
 dashes or word choices, because the right replacement depends on the sentence. Add `--in-place` to
 write the file back. It refuses code, `.docx` and `.pptx` files.
 
+**Pick a profile.** `--profile DIR` checks against another writer's profile, or a bundled one by name
+such as `starter`. `--which-profile` prints the one in use. [profiles.md](profiles.md) explains the order
+and every setting.
+
 **Calibrate on your own writing.**
 
 ```bash
@@ -102,7 +106,7 @@ python3 skills/jed-writing-style/scripts/ai_check.py --baseline ~/my-writing --s
 ```
 
 `--baseline` measures a folder of writing you wrote yourself and suggests thresholds for sentence
-length and commas. With no folder, it measures the quoted pieces in `references/samples.md`. Read the
+length and commas. With no folder, it measures the quoted pieces in the profile's `samples.md`. Read the
 suggestion before you save it. Three short pieces is a small base, and on Jed's samples it suggests
 limits tighter than the defaults that Jed's own LinkedIn post then fails. `--save` keeps them in
 `~/.claude/signature/calibration.json`, and later checks use them. They stay on your machine. Only measure your own writing, because text a model wrote would teach
@@ -135,7 +139,7 @@ applies the 95% and 90% human-share rule. It sends the text off this computer, s
 `references/detectors.md`. FIX means a score of 3 or more, a passage of 3 or more, an invented number or a missed
 script length. REVIEW means a score from 1 to 3 or a P0 tell. It exits 1 only on FIX.
 
-**Distance from Jed.** `--voice` compares a draft with the quoted writing in `references/samples.md`: words per
+**Distance from Jed.** `--voice` compares a draft with the quoted writing in the profile's `samples.md`: words per
 sentence, short sentences, commas, and for posts, messages, peer replies and course text, how often it says "I"
 and how many exclamation marks it uses. From six sentences on, it also checks how much sentence lengths vary.
 Claude's imitations of Jed came out flatter than Jed, because they dropped the longer sentences. It re-measures

@@ -62,10 +62,10 @@ MIN_SENTENCES_FOR_RHYTHM = 6
 # Under four sentences, one long sentence sets the whole average. Jed's own three-sentence paragraphs failed on
 # it, so averages wait for four. The per-sentence checks still run.
 MIN_SENTENCES_FOR_AVERAGES = 4
-# Jed asked twice for fewer commas. The approved customer doc sits at 0.73 per sentence.
-MAX_COMMAS_PER_SENTENCE = 1.0
-# A sentence with three or more commas is the one to split.
-HEAVY_COMMAS = 3
+# A profile sets its own comma limits. Without one, more than one and a half commas a sentence on average reads
+# as chained clauses, and a sentence with four or more is the one to split.
+MAX_COMMAS_PER_SENTENCE = 1.5
+HEAVY_COMMAS = 4
 # But a list of short items ("naming, comment density, idiom, formatter") is not a chain of clauses.
 # If the typical comma-separated piece is this many words or fewer, treat the sentence as a list.
 LIST_ITEM_WORDS = 3
@@ -94,18 +94,23 @@ IGNORE_LINE_RE = re.compile(r"^.*signature:ignore-line.*$", re.M)
 
 Register = namedtuple("Register", "rhythm variation mean_cap long_cap short_floor exclaim_ok commas semicolons")
 
-REGISTERS = {
-    "general": Register(True, True, DEFAULT_MEAN_CAP, DEFAULT_LONG_CAP, 0.05, True, True, True),
-    "doc": Register(True, True, DEFAULT_MEAN_CAP, DEFAULT_LONG_CAP, 0.20, False, True, True),
-    "customer": Register(True, True, DEFAULT_MEAN_CAP, DEFAULT_LONG_CAP, 0.20, False, True, True),
-    "course": Register(True, True, DEFAULT_MEAN_CAP, DEFAULT_LONG_CAP, 0.05, False, True, True),
-    "peer": Register(True, True, DEFAULT_MEAN_CAP, DEFAULT_LONG_CAP, 0.05, True, True, True),
-    "post": Register(True, True, DEFAULT_MEAN_CAP, DEFAULT_LONG_CAP, 0.05, True, True, True),
-    "message": Register(True, True, DEFAULT_MEAN_CAP, DEFAULT_LONG_CAP, 0.05, True, True, True),
-    "script": Register(True, False, SCRIPT_MEAN_CAP, SCRIPT_LONG_CAP, 0.0, True, True, True),
-    "slides": Register(False, False, None, None, 0.0, True, False, True),
-    "code": Register(False, False, None, None, 0.0, False, False, False),
+# What each register can check: rhythm, variation, mean and long caps, commas, semicolons. The active profile
+# adds its taste (short-sentence floor, exclamation marks, semicolons) to make REGISTERS. See Profile.registers.
+BASE_REGISTERS = {
+    "general": (True, True, DEFAULT_MEAN_CAP, DEFAULT_LONG_CAP, True, True),
+    "doc": (True, True, DEFAULT_MEAN_CAP, DEFAULT_LONG_CAP, True, True),
+    "customer": (True, True, DEFAULT_MEAN_CAP, DEFAULT_LONG_CAP, True, True),
+    "course": (True, True, DEFAULT_MEAN_CAP, DEFAULT_LONG_CAP, True, True),
+    "peer": (True, True, DEFAULT_MEAN_CAP, DEFAULT_LONG_CAP, True, True),
+    "post": (True, True, DEFAULT_MEAN_CAP, DEFAULT_LONG_CAP, True, True),
+    "message": (True, True, DEFAULT_MEAN_CAP, DEFAULT_LONG_CAP, True, True),
+    "script": (True, False, SCRIPT_MEAN_CAP, SCRIPT_LONG_CAP, True, True),
+    "slides": (False, False, None, None, False, True),
+    "code": (False, False, None, None, False, False),
 }
+# Short sentences should be at least this share of the text. Scripts, slides and code are not judged on it.
+SHORT_FLOOR = 0.05
+NO_SHORT_FLOOR = ("script", "slides", "code")
 
 REGISTER_HELP = {
     "general": "anything else. Shared checks only.",
@@ -130,9 +135,9 @@ BANNED_WORDS = [
     "empower", "empowers", "empowering", "elevate", "elevates", "harness", "harnessing", "tapestry",
     "testament", "moreover", "furthermore", "additionally", "multifaceted", "holistic", "synergy",
     "cutting-edge", "game-changer", "game changer", "revolutionize", "revolutionise", "streamline",
-    "streamlines", "paradigm shift", "ever-evolving", "only ever", "embark", "realm", "foster", "fosters",
+    "streamlines", "paradigm shift", "ever-evolving", "embark", "realm", "foster", "fosters",
     "underscore", "underscores", "showcase", "showcases", "meticulous", "meticulously", "intricate",
-    "nuanced", "mechanism", "psychosocial", "utilize", "utilise", "utilizes", "utilises", "facilitate",
+    "nuanced", "utilize", "utilise", "utilizes", "utilises", "facilitate",
     "facilitates", "boasts", "vibrant", "enhance", "enhances", "enhancing", "garner", "garnered", "bolster",
     "bolstered", "bolstering", "interplay", "align with", "aligns with", "orchestrate", "orchestrates",
     "nestled", "breathtaking", "groundbreaking", "indelible", "ever-changing", "unwavering",
@@ -176,11 +181,11 @@ PATTERNS = [
       "Formula ending. Delete it.", 3),
     P("P1", "discovery voice",
       r"\bwe(?:'ve|\s+have)?\s+(tried|ran|run|seen|saw|tested|deployed|found that|checked|noticed)\b",
-      "Jed is supposed to know the product. State the behaviour as fact.", 2, only=("customer", "doc")),
+      "You are supposed to know the product. State the behaviour as fact.", 2, only=("customer", "doc")),
     P("P1", "invented anecdote",
       r"\b(one (team|customer|client|company|person|manager) (i|we) (worked|spoke|talked|met)\w*|i once\b|"
       r"a friend of mine|someone (once )?told me|i (?:was )?talk(?:ed|ing) to a)",
-      "An anecdote Jed did not give. Use a placeholder like [a short story from the project] or cut it.", 3),
+      "An anecdote you did not give. Use a placeholder like [a short story from the project] or cut it.", 3),
     P("P1", "copula avoidance",
       r"\b(serves as|serve as|stands as|stand as|acts as a|functions as a|represents a (significant|major|key))\b",
       "Just say 'is'.", 2),
@@ -251,6 +256,98 @@ BUILTIN = {
     "uniform paragraphs": ("P2", 0.5, "Every paragraph is about the same length. Vary them."),
     "spoken length": ("P1", 2, "Adjust the script to the target length."),
 }
+
+
+# ---------------------------------------------------------------------------
+# Profiles. One writer's taste lives in a profile folder: profile.json and the voice files beside it. The
+# values above are the neutral defaults a profile can change.
+# ---------------------------------------------------------------------------
+
+PROFILES_DIR = Path(__file__).resolve().parent.parent / "profiles"
+# Used when nothing else picks a profile. Jed's, until `signature init` can build one for anyone.
+DEFAULT_PROFILE = "jed"
+USER_PROFILE = Path.home() / ".claude" / "signature" / "profile"
+
+# Taste a profile can switch on. Off by default, because each one is a habit some writers have on purpose.
+FLAGS = {"dashes": False, "semicolons": False, "curly_quotes": False, "emojis": False}
+# Exclamation marks look out of place in a doc or a customer answer whoever writes it.
+EXCLAMATIONS = ("general", "course", "peer", "post", "message", "script", "slides")
+
+# Wording a profile can change. Pattern advice is keyed by its label, voice notes by their row name.
+MESSAGES = {
+    "words per sentence": "Your samples run about %(mean).0f. Far longer reads stiff, far shorter reads clipped.",
+    "short sentences": "Your samples mix in short ones. Add a few.",
+    "commas per sentence": "Fewer commas a sentence. Split the long ones.",
+    "sentence length spread": "Your samples vary more. Let one sentence run long, or cut one right down.",
+    "I, my, we per 100 words": "Your samples speak from your own view. Say what you did or think.",
+    "exclamation marks per 100 words": "One burst of energy is fine. A string of them is not.",
+    "voice label": "samples",
+    "voice close": "close to your samples",
+    "voice measured": "(Measured on about %(words)d words of your writing. Read it as a nudge.)",
+}
+
+
+class ProfileError(Exception):
+    pass
+
+
+class Profile:
+    """One writer's taste: the settings in profile.json and the files beside it."""
+
+    def __init__(self, folder):
+        self.folder = Path(folder)
+        try:
+            data = json.loads((self.folder / "profile.json").read_text(encoding="utf8"))
+        except (OSError, ValueError) as e:
+            raise ProfileError("cannot read %s: %s" % (self.folder / "profile.json", e))
+        checker = data.get("checker", {})
+        self.name = data.get("name", "")
+        self.flags = dict(FLAGS, **checker.get("flag", {}))
+        self.max_commas = float(checker.get("max_commas", MAX_COMMAS_PER_SENTENCE))
+        self.heavy_commas = int(checker.get("heavy_commas", HEAVY_COMMAS))
+        self.exclamations = set(checker.get("exclamations_allowed", EXCLAMATIONS))
+        self.short_floor = checker.get("short_floor", {})
+        extra = [w for w in checker.get("extra_banned_words", []) if w not in BANNED_WORDS]
+        self.banned_words = BANNED_WORDS + extra
+        self.messages = dict(MESSAGES, **data.get("messages", {}))
+        self.reminder = data.get("reminder", "")
+        self.samples = self.folder / data.get("samples", "samples.md")
+
+    def registers(self):
+        regs = {}
+        for name, (rhythm, variation, mean_cap, long_cap, commas, semicolons) in BASE_REGISTERS.items():
+            floor = 0.0 if name in NO_SHORT_FLOOR else float(self.short_floor.get(name, SHORT_FLOOR))
+            regs[name] = Register(rhythm, variation, mean_cap, long_cap, floor, name in self.exclamations,
+                                  commas, semicolons and self.flags["semicolons"])
+        return regs
+
+
+def find_profile(choice=None):
+    """The profile folder: --profile, then SIGNATURE_PROFILE, then the user's own, then the bundled default.
+    A bare name like "starter" means a bundled profile."""
+    for value in (choice, os.environ.get("SIGNATURE_PROFILE")):
+        if value:
+            if os.sep not in value and (PROFILES_DIR / value).is_dir():
+                return PROFILES_DIR / value
+            return Path(value).expanduser()
+    if (USER_PROFILE / "profile.json").is_file():
+        return USER_PROFILE
+    return PROFILES_DIR / DEFAULT_PROFILE
+
+
+def use_profile(choice=None):
+    """Load a profile and make it the active one for every check. Raises ProfileError if it can't be read."""
+    global PROFILE, REGISTERS, SAMPLES_PATH
+    profile = Profile(find_profile(choice))
+    PROFILE, REGISTERS, SAMPLES_PATH = profile, profile.registers(), profile.samples
+    return profile
+
+
+try:
+    use_profile()
+except ProfileError as e:
+    print("ai_check: %s. Using the bundled %s profile." % (e, DEFAULT_PROFILE), file=sys.stderr)
+    use_profile(str(PROFILES_DIR / DEFAULT_PROFILE))
 
 
 # ---------------------------------------------------------------------------
@@ -458,7 +555,7 @@ def spoken_text(text):
 def effective_limits(reg, register, calibration):
     """Thresholds for this register. Calibration only changes the everyday prose registers."""
     limits = {"mean_cap": reg.mean_cap, "long_cap": reg.long_cap, "short_floor": reg.short_floor,
-              "max_commas": MAX_COMMAS_PER_SENTENCE}
+              "max_commas": PROFILE.max_commas}
     if calibration and register not in ("script", "slides", "code"):
         for key, (low, high) in CALIBRATION_BOUNDS.items():
             if key in calibration:
@@ -495,14 +592,16 @@ def analyse(raw, register="general", suffix="", facts=None, target_seconds=None,
         findings.append({"tier": tier or t, "label": label, "line": line, "snippet": snip,
                          "advice": advice or a, "weight": w if weight is None else weight})
 
-    for m in DASH.finditer(text):
-        add("dash", line_of(text, m.start()), snippet(text, m.start(), m.end(), 30))
-    if register == "code":
-        for f in findings:
-            f["weight"] = 1  # a quick "x - y" in a comment is minor. A dash in prose is not.
+    flags = PROFILE.flags
+    if flags["dashes"]:
+        for m in DASH.finditer(text):
+            add("dash", line_of(text, m.start()), snippet(text, m.start(), m.end(), 30))
+        if register == "code":
+            for f in findings:
+                f["weight"] = 1  # a quick "x - y" in a comment is minor. A dash in prose is not.
 
     low = text.lower()
-    for w in BANNED_WORDS:
+    for w in PROFILE.banned_words:
         for m in re.finditer(r"(?<![\w-])" + re.escape(w) + r"(?![\w-])", low):
             add("banned word", line_of(text, m.start()), snippet(text, m.start(), m.end()),
                 advice="'%s' reads as generated. Say it plainly." % w)
@@ -512,22 +611,22 @@ def analyse(raw, register="general", suffix="", facts=None, target_seconds=None,
             continue
         for m in pat.regex.finditer(text):
             add(pat.label, line_of(text, m.start()), " ".join(m.group(0).split()),
-                advice=pat.advice, tier=pat.tier, weight=pat.weight)
+                advice=PROFILE.messages.get(pat.label, pat.advice), tier=pat.tier, weight=pat.weight)
 
     if reg.commas:
         for s in sents:
             n = s.count(",")
-            if n >= HEAVY_COMMAS and not is_list(s):
+            if n >= PROFILE.heavy_commas and not is_list(s):
                 add("comma-heavy sentence", line_of(text, max(text.find(s[:30]), 0)), " ".join(s.split())[:90],
                     advice="%d commas. Split it into two sentences." % n)
     if reg.semicolons:
         for m in re.finditer(r";", text):
             add("semicolon", line_of(text, m.start()), snippet(text, m.start(), m.end(), 25))
-    if suffix not in (".docx", ".pptx", ".html", ".htm", ".ipynb"):
+    if flags["curly_quotes"] and suffix not in (".docx", ".pptx", ".html", ".htm", ".ipynb"):
         n_curly = len(CURLY.findall(text))
         if n_curly:
             add("curly quotes", 0, "%d found" % n_curly)
-    if register not in ("post", "message"):
+    if flags["emojis"] and register not in ("post", "message"):
         for m in EMOJI.finditer(text):
             add("emoji", line_of(text, m.start()), snippet(text, m.start(), m.end(), 20))
     if not reg.exclaim_ok and text.count("!"):
@@ -658,9 +757,10 @@ def fix_text(raw):
             gap, n = regex.subn(lambda m: _keep_case(m.group(0), new), gap)
             if n:
                 counts[label] = counts.get(label, 0) + n
-        gap, n = CURLY.subn(lambda m: CURLY_MAP[m.group(0)], gap)
-        if n:
-            counts["curly quotes"] = counts.get("curly quotes", 0) + n
+        if PROFILE.flags["curly_quotes"]:
+            gap, n = CURLY.subn(lambda m: CURLY_MAP[m.group(0)], gap)
+            if n:
+                counts["curly quotes"] = counts.get("curly quotes", 0) + n
         return gap
 
     out, last = [], 0
@@ -855,7 +955,6 @@ def window_scores(raw, register, suffix, calibration=None):
 # Voice distance, the gate, and a private history
 # ---------------------------------------------------------------------------
 
-SAMPLES_PATH = Path(__file__).resolve().parent.parent / "references" / "samples.md"
 HISTORY_PATH = Path(os.environ.get("SIGNATURE_HISTORY") or Path.home() / ".claude" / "signature" / "history.jsonl")
 PERSONAL = {"general", "post", "message", "course", "peer"}
 # In a test on 13 of Jed's passages, Jed's pieces spread 5.2 to 8.1 words a sentence (standard deviation). Claude
@@ -874,10 +973,10 @@ def _voice_numbers(text):
             "exclaim": 100.0 * text.count("!") / len(words)}
 
 
-def voice_profile(path=SAMPLES_PATH):
-    """Measure Jed's own writing: the quoted samples in references/samples.md. None if it can't be read."""
+def voice_profile(path=None):
+    """Measure the writer's own writing: the quoted samples in the profile's samples.md. None if it can't be read."""
     try:
-        text = Path(path).read_text(encoding="utf8")
+        text = Path(path or SAMPLES_PATH).read_text(encoding="utf8")
     except OSError:
         return None
     quoted = "\n".join(l[2:] if l.startswith("> ") else "" for l in text.splitlines() if l.startswith(">"))
@@ -885,31 +984,31 @@ def voice_profile(path=SAMPLES_PATH):
 
 
 def voice_check(raw, register, profile):
-    """Compare a draft with Jed's samples. Returns a list of (name, jed, draft, ok, note). Personal registers only."""
+    """Compare a draft with the writer's samples. Returns a list of (name, writer, draft, ok, note). Personal
+    registers only."""
     if not profile or register not in PERSONAL:
         return []
     d = _voice_numbers(strip_markup(raw))
     if d["sentences"] < 4:
         return []
+    say = PROFILE.messages
     rows = [
         ("words per sentence", profile["mean_words"], d["mean_words"],
          0.6 * profile["mean_words"] <= d["mean_words"] <= 1.4 * profile["mean_words"],
-         "Jed's runs about %.0f. Far longer reads stiff, far shorter reads clipped." % profile["mean_words"]),
+         say["words per sentence"] % {"mean": profile["mean_words"]}),
         ("short sentences", profile["short_share"] * 100, d["short_share"] * 100,
-         d["short_share"] >= 0.5 * profile["short_share"], "Jed mixes in short ones. Add a few."),
-        ("commas per sentence", profile["commas"], d["commas"], d["commas"] <= 1.0,
-         "Under one a sentence. Split the long ones."),
+         d["short_share"] >= 0.5 * profile["short_share"], say["short sentences"]),
+        ("commas per sentence", profile["commas"], d["commas"], d["commas"] <= PROFILE.max_commas,
+         say["commas per sentence"]),
     ]
     if d["sentences"] >= MIN_SENTENCES_FOR_RHYTHM:
         rows.append(("sentence length spread", profile["spread"], d["spread"],
-                     d["spread"] >= VOICE_SPREAD_SHARE * profile["spread"],
-                     "Jed's lengths vary more. Let one sentence run long, or cut one right down."))
+                     d["spread"] >= VOICE_SPREAD_SHARE * profile["spread"], say["sentence length spread"]))
     if register in ("post", "message", "course", "peer"):
         rows.append(("I, my, we per 100 words", profile["first_person"], d["first_person"],
-                     d["first_person"] >= 0.25 * profile["first_person"],
-                     "Jed writes from his own view. Say what you did or think."))
+                     d["first_person"] >= 0.25 * profile["first_person"], say["I, my, we per 100 words"]))
         rows.append(("exclamation marks per 100 words", profile["exclaim"], d["exclaim"], d["exclaim"] <= 3 * max(profile["exclaim"], 1),
-                     "One burst of energy is Jed. A string of them is not."))
+                     say["exclamation marks per 100 words"]))
     return rows
 
 
@@ -1030,19 +1129,31 @@ def main(argv=None):
     ap.add_argument("--target-seconds", type=int, metavar="N", help="for scripts: flag a spoken length that misses N seconds by more than 15 percent")
     ap.add_argument("--compare", nargs=2, metavar=("OLD", "NEW"), help="score a draft before and after a rewrite, list the tells removed or added, and check the numbers, quotes and names you wrote survived")
     ap.add_argument("--gate", action="store_true", help="print one PASS, REVIEW or FIX verdict against the threshold in references/detectors.md")
-    ap.add_argument("--voice", action="store_true", help="compare the draft with Jed's own samples (personal registers: general, post, message, course)")
+    ap.add_argument("--voice", action="store_true", help="compare the draft with the profile's samples (personal registers: general, post, message, course, peer)")
     ap.add_argument("--log", action="store_true", help="add this check to your private history (numbers and tell names only, never the text)")
     ap.add_argument("--history", action="store_true", help="show how your recent scores are moving and which tells keep coming back")
     ap.add_argument("--fix", action="store_true", help="print the text with safe mechanical fixes applied")
     ap.add_argument("--in-place", action="store_true", help="with --fix, write the result back to the file")
-    ap.add_argument("--baseline", metavar="DIR", nargs="?", const=str(SAMPLES_PATH),
-                    help="measure a folder of your own writing and suggest thresholds. With no folder, measure references/samples.md")
+    ap.add_argument("--baseline", metavar="DIR", nargs="?", const=True,
+                    help="measure a folder of your own writing and suggest thresholds. With no folder, measure the profile's samples.md")
+    ap.add_argument("--profile", metavar="DIR", help="use this profile folder, or a bundled one by name such as jed or starter")
+    ap.add_argument("--which-profile", action="store_true", help="print the active profile's folder and name, then exit")
     ap.add_argument("--save", action="store_true", help="with --baseline, save the thresholds to %s" % CALIBRATION_PATH)
     ap.add_argument("--calibration", metavar="FILE", help="thresholds to use instead of the saved ones")
     ap.add_argument("--strings", action="store_true", help="for source files, also read user-facing strings, not only comments")
     ap.add_argument("--no-calibration", action="store_true", help="ignore any saved thresholds")
     ap.add_argument("--version", action="version", version="ai_check " + __version__)
     args = ap.parse_args(argv)
+
+    if args.profile:
+        try:
+            use_profile(args.profile)
+        except ProfileError as e:
+            print("ai_check: %s" % e, file=sys.stderr)
+            return 2
+    if args.which_profile:
+        print("%s\t%s" % (PROFILE.folder, PROFILE.name or "(no name)"))
+        return 0
 
     if args.list_registers:
         for name in sorted(REGISTERS):
@@ -1060,9 +1171,10 @@ def main(argv=None):
         print("Take a repeating tell to /signature:learn if it should become a rule.")
         return 0
     if args.baseline:
-        rows, suggestion = measure_folder(args.baseline)
+        source = SAMPLES_PATH if args.baseline is True else args.baseline
+        rows, suggestion = measure_folder(source)
         if not rows:
-            print("ai_check: no writing with %d or more sentences in %s" % (MIN_SENTENCES_FOR_RHYTHM, args.baseline), file=sys.stderr)
+            print("ai_check: no writing with %d or more sentences in %s" % (MIN_SENTENCES_FOR_RHYTHM, source), file=sys.stderr)
             return 2
         print("%-34s %6s %7s %7s %7s" % ("piece", "words", "mean", "short", "commas"))
         for name, r in rows:
@@ -1071,7 +1183,7 @@ def main(argv=None):
         print("  mean_cap    %-5s [%s]" % (suggestion["mean_cap"], DEFAULT_MEAN_CAP))
         print("  long_cap    %-5s [%s]" % (suggestion["long_cap"], DEFAULT_LONG_CAP))
         print("  short_floor %-5s [0.05 to 0.20 by register]" % suggestion["short_floor"])
-        print("  max_commas  %-5s [%s]" % (suggestion["max_commas"], MAX_COMMAS_PER_SENTENCE))
+        print("  max_commas  %-5s [%s]" % (suggestion["max_commas"], PROFILE.max_commas))
         if args.save:
             CALIBRATION_PATH.parent.mkdir(parents=True, exist_ok=True)
             CALIBRATION_PATH.write_text(json.dumps(suggestion, indent=2) + "\n")
@@ -1153,13 +1265,14 @@ def main(argv=None):
         if args.voice:
             rows = voice_check(raw, register, voice_profile())
             if not rows:
-                print("Voice: not compared (needs a personal register such as post, message, peer or course, a draft of 4 or more sentences, and references/samples.md).")
+                print("Voice: not compared (needs a personal register such as post, message, peer or course, a draft of 4 or more sentences, and a profile with samples).")
             else:
                 off = [r for r in rows if not r[3]]
-                print("Voice: %s." % ("close to Jed's samples" if not off else "drifting on %d of %d" % (len(off), len(rows))))
+                say = PROFILE.messages
+                print("Voice: %s." % (say["voice close"] if not off else "drifting on %d of %d" % (len(off), len(rows))))
                 for name, jed, draft, ok, note in rows:
-                    print("  %s %s: Jed %.1f, draft %.1f.%s" % ("ok " if ok else "off", name, jed, draft, "" if ok else " " + note))
-                print("  (Measured on about 500 words of Jed's writing. Read it as a nudge.)")
+                    print("  %s %s: %s %.1f, draft %.1f.%s" % ("ok " if ok else "off", name, say["voice label"], jed, draft, "" if ok else " " + note))
+                print("  " + say["voice measured"] % {"words": round(voice_profile()["words"], -2)})
         if worst >= FIX_AT and result["score"] < FIX_AT:
             print("A passage scores %.1f, so fix the hot spots even though the whole text is %s." % (worst, result["verdict"]))
     if args.log:

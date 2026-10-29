@@ -136,7 +136,8 @@ def classify(root, rel, include_code, patterns=(), keep_all=False):
     if is_ignored(rel, patterns):
         return False, "excluded"
     if not keep_all and NOT_JEDS.search(rel.as_posix()):
-        return False, "probably not Jed's writing (sample, transcript, syllabus or similar). Use --all to include"
+        who = ai_check.PROFILE.name + "'s" if ai_check.PROFILE.name else "the writer's"
+        return False, "probably not %s writing (sample, transcript, syllabus or similar). Use --all to include" % who
     parts = {p.lower() for p in rel.parts}
     if parts & SKIP_DIRS or any(p.startswith(".") and p not in (".", "..") for p in rel.parts[:-1]):
         return False, "skipped folder"

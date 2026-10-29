@@ -10,6 +10,7 @@ Run from the repo root:
 """
 import hashlib
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -24,6 +25,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SKILL = ROOT / "skills" / "jed-writing-style"
 APPLY = SKILL / "scripts" / "apply_edits.py"
 sys.path.insert(0, str(SKILL / "scripts"))
+os.environ.setdefault("SIGNATURE_PROFILE", "jed")  # a private profile on this machine must not change results
 
 import apply_edits  # noqa: E402
 import formats  # noqa: E402

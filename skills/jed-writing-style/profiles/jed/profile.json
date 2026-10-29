@@ -1,0 +1,52 @@
+{
+  "name": "Jed",
+  "samples": "samples.md",
+  "checker": {
+    "flag": {
+      "dashes": true,
+      "semicolons": true,
+      "curly_quotes": true,
+      "emojis": true
+    },
+    "max_commas": 1.0,
+    "heavy_commas": 3,
+    "exclamations_allowed": [
+      "general",
+      "peer",
+      "post",
+      "message",
+      "script",
+      "slides"
+    ],
+    "short_floor": {
+      "doc": 0.2,
+      "customer": 0.2
+    },
+    "extra_banned_words": [
+      "only ever",
+      "mechanism",
+      "psychosocial"
+    ]
+  },
+  "notes": {
+    "flag": "Jed removes dashes, semicolons, curly quotes and emojis every time.",
+    "max_commas": "Jed asked twice for fewer commas. The approved customer doc sits at 0.73 per sentence.",
+    "heavy_commas": "A sentence with three or more commas is the one to split.",
+    "exclamations_allowed": "None in docs, customer answers or course papers. A greeting like Hi [name]!! is fine in a peer reply.",
+    "extra_banned_words": "Words Jed struck out that are not general AI tells. See voice.md."
+  },
+  "messages": {
+    "discovery voice": "Jed is supposed to know the product. State the behaviour as fact.",
+    "invented anecdote": "An anecdote Jed did not give. Use a placeholder like [a short story from the project] or cut it.",
+    "words per sentence": "Jed's runs about %(mean).0f. Far longer reads stiff, far shorter reads clipped.",
+    "short sentences": "Jed mixes in short ones. Add a few.",
+    "commas per sentence": "Under one a sentence. Split the long ones.",
+    "sentence length spread": "Jed's lengths vary more. Let one sentence run long, or cut one right down.",
+    "I, my, we per 100 words": "Jed writes from his own view. Say what you did or think.",
+    "exclamation marks per 100 words": "One burst of energy is Jed. A string of them is not.",
+    "voice label": "Jed",
+    "voice close": "close to Jed's samples",
+    "voice measured": "(Measured on about %(words)d words of Jed's writing. Read it as a nudge.)"
+  },
+  "reminder": "Writing rule for this session: anything written under Jed's name (code comments, commit messages, READMEs, docs, slides, scripts, posts, messages, assignments) follows the jed-writing-style skill. Load it before drafting. Core rules: warm and plain, point first, no em or en dashes, under one comma per sentence, no semicolons, no LLM words or tidy groups of three. Use only the facts Jed gave you: no invented numbers, anecdotes or advice. Run the skill's scripts/ai_check.py (with --facts-text, and --target-seconds for scripts) on finished drafts. Local project rules (CLAUDE.md, rubrics, repo conventions) win where they differ."
+}
