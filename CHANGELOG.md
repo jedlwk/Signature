@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.10.0
+
+Edit capture. My edits to what Claude writes become the evidence the guide learns from, with no extra steps.
+
+- **New `scripts/capture.py`.** A hook saves Claude's version of each prose file it writes. Pairing then
+  compares it with the latest commit within 14 days and records which of Claude's passages were kept,
+  edited or cut. Only passages Claude wrote count.
+- **Off until `capture.py enable`.** Everything stays in `~/.claude/signature/`, readable only by me. Pairs
+  are kept 90 days. `--exclude`, `.signatureignore` and `--numbers-only` keep sensitive text out.
+- **`capture.py report`** shows the share of Claude's words I changed each week, the tells I removed and the
+  words I cut and added most.
+- **`/signature:learn --from-git`** reads those pairs and proposes rules that repeat, with counts.
+- **Wiring.** The plugin runs the hook after Write and Edit and pairs at session start.
+  `install.sh --capture` adds the same hooks to `settings.json` for an install without the plugin, and
+  keeps a copy of the file first.
+- [docs/capture.md](docs/capture.md) explains it.
+
 ## 2.9.0
 
 The voice moves into a profile, so the engine works for anyone. Nothing changes for me.

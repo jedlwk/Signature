@@ -477,7 +477,7 @@ class DocsPracticeWhatTheyPreach(unittest.TestCase):
     """The skill's own files must pass the checker, like the repo it learned from does."""
 
     def test_docs(self):
-        files = [ROOT / "README.md", ROOT / "CHANGELOG.md", ROOT / "docs" / "checker.md", ROOT / "docs" / "restyle.md", ROOT / "docs" / "profiles.md",
+        files = [ROOT / "README.md", ROOT / "CHANGELOG.md", ROOT / "docs" / "checker.md", ROOT / "docs" / "restyle.md", ROOT / "docs" / "profiles.md", ROOT / "docs" / "capture.md",
                  SKILL / "SKILL.md"] + sorted((SKILL / "references").glob("*.md")) + sorted((SKILL / "profiles").glob("*/*.md"))
         for path in files:
             register = "post" if path.name == "posts-and-messages.md" else "doc"
@@ -589,7 +589,7 @@ class PluginShape(unittest.TestCase):
     def test_relative_links_resolve(self):
         import re
         pages = [ROOT / "README.md", ROOT / "CHANGELOG.md", ROOT / "docs" / "checker.md", ROOT / "docs" / "restyle.md", ROOT / "docs" / "develop.md", ROOT / "docs" / "anywhere.md", ROOT / "evals" / "README.md",
-                 ROOT / "evals" / "RESULTS.md", ROOT / "docs" / "profiles.md", SKILL / "SKILL.md"] + sorted((SKILL / "references").glob("*.md")) \
+                 ROOT / "evals" / "RESULTS.md", ROOT / "docs" / "profiles.md", ROOT / "docs" / "capture.md", SKILL / "SKILL.md"] + sorted((SKILL / "references").glob("*.md")) \
             + sorted((SKILL / "profiles").glob("*/*.md"))
         for page in pages:
             for target in re.findall(r"\]\((?!https?:|mailto:|#)([^)#\s]+)", page.read_text()):

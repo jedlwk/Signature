@@ -127,7 +127,8 @@ text. The goal is writing that sounds like Jed, not text that games a detector.
 - `/signature:apply` applies only the changes Jed approved in that plan, using `scripts/apply_edits.py`.
 - `/signature:verify <file>` checks a changed Word or PowerPoint file in place of opening it.
 - `/signature:learn` compares what Claude wrote with what Jed changed it to, and proposes a rule or
-  an example. It asks before writing, and keeps the log private.
+  an example. It asks before writing, and keeps the log private. `--from-git` reads the edits that edit
+  capture recorded.
 
 ## Keep this up to date
 

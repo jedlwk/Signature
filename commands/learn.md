@@ -1,6 +1,6 @@
 ---
 description: Learn from Jed's edits. Compare what Claude wrote with what Jed changed it to, and propose a rule or example
-argument-hint: [before and after, or two file paths]
+argument-hint: [before and after, two file paths, or --from-git]
 ---
 
 Learn mode. Turn Jed's correction into evidence for the style guide: $ARGUMENTS
@@ -10,6 +10,13 @@ every edit.
 
 1. Get the two versions. Jed may paste a before and an after, give two file paths, or say "compare
    what you wrote with what I changed". If there is no second version, ask for it.
+
+   With `--from-git`, or "learn from my recent edits", the versions come from edit capture. Run
+   `python3 "${CLAUDE_PLUGIN_ROOT}/skills/jed-writing-style/scripts/capture.py" pair`, then the same
+   script with `report --passages 30`. If capture is off or nothing is paired yet, say so and stop. Treat
+   each change it prints as one before and after. Only a pattern seen in two or more changes counts, and
+   say how many times and in how many files. The report's "tells you removed" and "words you cut most"
+   are evidence too.
 2. Compare them. List what Jed changed, then name the pattern in one line. Examples: "cut the closing
    summary", "swapped a formal word for a plain one", "removed a dash".
 3. Check whether the guide already covers it. Read the matching file in the jed-writing-style

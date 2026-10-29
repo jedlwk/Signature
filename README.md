@@ -83,8 +83,8 @@ PowerPoint keep their formatting, because only the text changes. It also handles
 session with nothing installed can fetch it with one pasted prompt, and a chat with no shell gets a find
 and replace table. See [docs/anywhere.md](docs/anywhere.md).
 
-`/signature:learn` keeps a private log of my corrections in `~/.claude/signature/` on my machine. It is
-never committed, and anything confidential is replaced with a placeholder first.
+`/signature:learn` keeps a private log of my corrections in `~/.claude/signature/`, never committed and with
+anything confidential replaced first. [Edit capture](docs/capture.md) can record them for you. It starts off.
 
 Claude picks one of six modes from what you say:
 
