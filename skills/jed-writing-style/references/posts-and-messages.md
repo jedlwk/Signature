@@ -1,7 +1,7 @@
 # Posts and messages
 
 The most personal register. LinkedIn and Medium posts, messages to teammates, emails, peer comments,
-and short pieces like names and taglines. Checker registers: `post`, `message`.
+and short pieces like names and taglines. Checker registers: `post`, `message`, `peer`.
 
 ## Contents
 - LinkedIn posts
@@ -76,6 +76,8 @@ For a course roundtable or discussion thread.
 
 For replies in a discussion forum, one paragraph. Pick the one thing in their post worth answering.
 Agree, push back gently, or extend it with the reading. Then add Jed's angle.
+
+Check these with `--register peer`. The `course` register is for the paper itself, and it would flag the greeting.
 
 ## Asking questions
 

@@ -59,6 +59,9 @@ DEFAULT_LONG_CAP = 30
 MIN_STDEV = 4.0
 # Fewer than six sentences is too small a sample to judge rhythm.
 MIN_SENTENCES_FOR_RHYTHM = 6
+# Under four sentences, one long sentence sets the whole average. Jed's own three-sentence paragraphs failed on
+# it, so averages wait for four. The per-sentence checks still run.
+MIN_SENTENCES_FOR_AVERAGES = 4
 # Jed asked twice for fewer commas. The approved customer doc sits at 0.73 per sentence.
 MAX_COMMAS_PER_SENTENCE = 1.0
 # A sentence with three or more commas is the one to split.
@@ -96,6 +99,7 @@ REGISTERS = {
     "doc": Register(True, True, DEFAULT_MEAN_CAP, DEFAULT_LONG_CAP, 0.20, False, True, True),
     "customer": Register(True, True, DEFAULT_MEAN_CAP, DEFAULT_LONG_CAP, 0.20, False, True, True),
     "course": Register(True, True, DEFAULT_MEAN_CAP, DEFAULT_LONG_CAP, 0.05, False, True, True),
+    "peer": Register(True, True, DEFAULT_MEAN_CAP, DEFAULT_LONG_CAP, 0.05, True, True, True),
     "post": Register(True, True, DEFAULT_MEAN_CAP, DEFAULT_LONG_CAP, 0.05, True, True, True),
     "message": Register(True, True, DEFAULT_MEAN_CAP, DEFAULT_LONG_CAP, 0.05, True, True, True),
     "script": Register(True, False, SCRIPT_MEAN_CAP, SCRIPT_LONG_CAP, 0.0, True, True, True),
@@ -108,6 +112,7 @@ REGISTER_HELP = {
     "doc": "READMEs, reports, one-pagers. Exclamation marks flagged.",
     "customer": "customer docs and Q&A. Adds open-loop and discovery-voice checks.",
     "course": "course papers and discussion posts. Exclamation marks flagged.",
+    "peer": "replies to classmates and peer comments. Exclamation marks allowed, as in \"Hi [name]!!\".",
     "post": "LinkedIn and Medium. Exclamation marks allowed.",
     "message": "teammate messages and emails. Exclamation marks allowed.",
     "script": "speaker and video scripts. Short spoken sentences, nothing unsayable.",
@@ -579,10 +584,11 @@ def analyse(raw, register="general", suffix="", facts=None, target_seconds=None,
     n_long = sum(1 for n in lens if limits["long_cap"] and n > limits["long_cap"])
     commas = text.count(",") / max(len(sents), 1)
     enough = len(lens) >= MIN_SENTENCES_FOR_RHYTHM
+    averages = len(lens) >= MIN_SENTENCES_FOR_AVERAGES
 
     rhythm = []
     if reg.rhythm:
-        if mean > limits["mean_cap"]:
+        if averages and mean > limits["mean_cap"]:
             rhythm.append("Mean sentence length %.0f words. Aim for %s." % (mean, "about 10" if register == "script" else "12 to 15"))
         if reg.variation and enough and stdev < MIN_STDEV:
             rhythm.append("Sentence lengths barely vary (stdev %.1f). Mix short lines with longer ones." % stdev)
@@ -590,8 +596,8 @@ def analyse(raw, register="general", suffix="", facts=None, target_seconds=None,
             rhythm.append("Only %.0f%% of sentences are under %d words. Mix in some short ones." % (short * 100, SHORT_WORDS))
         if n_long > max(1, len(lens) // 12):
             rhythm.append("%d sentences over %d words. Split them." % (n_long, limits["long_cap"]))
-    if reg.commas and commas > limits["max_commas"]:
-        rhythm.append("%.2f commas per sentence. Aim for under 1." % commas)
+    if reg.commas and averages and commas > limits["max_commas"]:
+        rhythm.append("%.2f commas per sentence. Aim for under %g." % (commas, limits["max_commas"]))
 
     n_not_x = sum(1 for f in findings if f["label"] == "not X but Y")
     weighted = sum(f["weight"] for f in findings) - (1 if n_not_x == 1 else 0)
@@ -604,7 +610,7 @@ def analyse(raw, register="general", suffix="", facts=None, target_seconds=None,
 
     return {
         "register": register, "verdict": verdict, "score": round(score, 2), "words": n_words,
-        "sentences": len(sents), "mean_words": round(mean, 1), "median_words": median,
+        "sentences": len(sents), "mean_words": round(mean, 1), "median_words": median, "stdev_words": round(stdev, 1),
         "short_share": round(short, 2), "over_long": n_long, "commas_per_sentence": round(commas, 2),
         "dashes": counts.get("dash", 0), "banned_words": counts.get("banned word", 0),
         "other_tells": sum(v for k, v in counts.items() if k not in ("dash", "banned word", "group of three?")),
@@ -670,10 +676,29 @@ def fix_text(raw):
 # Calibration from Jed's own writing
 # ---------------------------------------------------------------------------
 
+def sample_pieces(path):
+    """The quoted writing under each heading of a samples file, as (heading, text) pairs."""
+    pieces, name, lines = [], None, []
+    for line in Path(path).read_text(encoding="utf8").splitlines() + ["## end"]:
+        if line.startswith("## "):
+            if name and lines:
+                pieces.append((name, "\n".join(lines)))
+            name, lines = line[3:].strip(), []
+        elif line.startswith(">"):
+            lines.append(line[1:].strip())
+    return pieces
+
+
 def measure_folder(folder):
-    """Measure a folder of writing and suggest thresholds. Returns (rows, suggestion)."""
+    """Measure a folder of writing, or the pieces in a samples file, and suggest thresholds. Returns (rows, suggestion)."""
     rows = []
-    for path in sorted(Path(folder).expanduser().rglob("*")):
+    target = Path(folder).expanduser()
+    if target.is_file():
+        for name, text in sample_pieces(target):
+            r = analyse(text, "general")
+            if r["sentences"] >= MIN_SENTENCES_FOR_RHYTHM:
+                rows.append((name, r))
+    for path in sorted(target.rglob("*")) if target.is_dir() else []:
         if path.suffix.lower() not in (".md", ".txt", ".docx", ".pptx") or not path.is_file():
             continue
         try:
@@ -832,14 +857,18 @@ def window_scores(raw, register, suffix, calibration=None):
 
 SAMPLES_PATH = Path(__file__).resolve().parent.parent / "references" / "samples.md"
 HISTORY_PATH = Path(os.environ.get("SIGNATURE_HISTORY") or Path.home() / ".claude" / "signature" / "history.jsonl")
-PERSONAL = {"general", "post", "message", "course"}
+PERSONAL = {"general", "post", "message", "course", "peer"}
+# In a test on 13 of Jed's passages, Jed's pieces spread 5.2 to 8.1 words a sentence (standard deviation). Claude
+# drafts written with this skill spread 3.5 to 5.3, because they dropped Jed's longer sentences. At 0.65 of the
+# samples' spread (about 4.9), 7 of 9 drafts and none of Jed's pieces fall under. Set on that test, so a nudge.
+VOICE_SPREAD_SHARE = 0.65
 FIRST_PERSON = {"i", "my", "me", "i'm", "i've", "i'd", "we", "our", "us"}
 
 
 def _voice_numbers(text):
     r = analyse(text, "general")
     words = [w.lower() for w in WORD.findall(strip_markup(text))] or [""]
-    return {"mean_words": r["mean_words"], "short_share": r["short_share"],
+    return {"mean_words": r["mean_words"], "short_share": r["short_share"], "spread": r["stdev_words"],
             "commas": r["commas_per_sentence"], "sentences": r["sentences"], "words": len(words),
             "first_person": 100.0 * sum(1 for w in words if w in FIRST_PERSON) / len(words),
             "exclaim": 100.0 * text.count("!") / len(words)}
@@ -871,7 +900,11 @@ def voice_check(raw, register, profile):
         ("commas per sentence", profile["commas"], d["commas"], d["commas"] <= 1.0,
          "Under one a sentence. Split the long ones."),
     ]
-    if register in ("post", "message", "course"):
+    if d["sentences"] >= MIN_SENTENCES_FOR_RHYTHM:
+        rows.append(("sentence length spread", profile["spread"], d["spread"],
+                     d["spread"] >= VOICE_SPREAD_SHARE * profile["spread"],
+                     "Jed's lengths vary more. Let one sentence run long, or cut one right down."))
+    if register in ("post", "message", "course", "peer"):
         rows.append(("I, my, we per 100 words", profile["first_person"], d["first_person"],
                      d["first_person"] >= 0.25 * profile["first_person"],
                      "Jed writes from his own view. Say what you did or think."))
@@ -1002,7 +1035,8 @@ def main(argv=None):
     ap.add_argument("--history", action="store_true", help="show how your recent scores are moving and which tells keep coming back")
     ap.add_argument("--fix", action="store_true", help="print the text with safe mechanical fixes applied")
     ap.add_argument("--in-place", action="store_true", help="with --fix, write the result back to the file")
-    ap.add_argument("--baseline", metavar="DIR", help="measure a folder of your own writing and suggest thresholds")
+    ap.add_argument("--baseline", metavar="DIR", nargs="?", const=str(SAMPLES_PATH),
+                    help="measure a folder of your own writing and suggest thresholds. With no folder, measure references/samples.md")
     ap.add_argument("--save", action="store_true", help="with --baseline, save the thresholds to %s" % CALIBRATION_PATH)
     ap.add_argument("--calibration", metavar="FILE", help="thresholds to use instead of the saved ones")
     ap.add_argument("--strings", action="store_true", help="for source files, also read user-facing strings, not only comments")
@@ -1028,12 +1062,12 @@ def main(argv=None):
     if args.baseline:
         rows, suggestion = measure_folder(args.baseline)
         if not rows:
-            print("ai_check: no .md, .txt, .docx or .pptx files with enough sentences in %s" % args.baseline, file=sys.stderr)
+            print("ai_check: no writing with %d or more sentences in %s" % (MIN_SENTENCES_FOR_RHYTHM, args.baseline), file=sys.stderr)
             return 2
-        print("%-34s %6s %7s %7s %7s" % ("file", "words", "mean", "short", "commas"))
+        print("%-34s %6s %7s %7s %7s" % ("piece", "words", "mean", "short", "commas"))
         for name, r in rows:
             print("%-34s %6d %7.1f %6.0f%% %7.2f" % (name[:34], r["words"], r["mean_words"], r["short_share"] * 100, r["commas_per_sentence"]))
-        print("\nSuggested thresholds from %d files (defaults in brackets):" % suggestion["files"])
+        print("\nSuggested thresholds from %d pieces of writing (defaults in brackets):" % suggestion["files"])
         print("  mean_cap    %-5s [%s]" % (suggestion["mean_cap"], DEFAULT_MEAN_CAP))
         print("  long_cap    %-5s [%s]" % (suggestion["long_cap"], DEFAULT_LONG_CAP))
         print("  short_floor %-5s [0.05 to 0.20 by register]" % suggestion["short_floor"])
@@ -1119,7 +1153,7 @@ def main(argv=None):
         if args.voice:
             rows = voice_check(raw, register, voice_profile())
             if not rows:
-                print("Voice: not compared (needs a personal register such as post, message or course, a draft of 4 or more sentences, and references/samples.md).")
+                print("Voice: not compared (needs a personal register such as post, message, peer or course, a draft of 4 or more sentences, and references/samples.md).")
             else:
                 off = [r for r in rows if not r[3]]
                 print("Voice: %s." % ("close to Jed's samples" if not off else "drifting on %d of %d" % (len(off), len(rows))))

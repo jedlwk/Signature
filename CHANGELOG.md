@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.8.0
+
+Three fixes from testing the checker on Jed's own writing. Claude wrote 39 drafts as Jed from the same briefs as
+13 of Jed's real passages. Every draft passed the gate, and 3 of Jed's passages did not.
+
+- **A `peer` register.** Replies to classmates now have their own register, with exclamation marks allowed. The
+  `course` register gave Jed's own "Hi [name]!!" reply a FIX.
+- **Averages wait for four sentences.** Under four, one long sentence sets the whole average, and two of Jed's
+  three-sentence paragraphs failed on it. The per-sentence checks still run. Now 12 of the 13 pass. The last has
+  a sentence with three commas, which Jed's own rule still flags.
+- **`--baseline` with no folder** measures `references/samples.md`. The suggestion is not saved by default, and it
+  shouldn't be yet. On Jed's samples it tightens the limits enough that Jed's LinkedIn post fails.
+- **Spread in `--voice`.** A new row compares how much sentence lengths vary. Jed's pieces spread 5.2 to 8.1 words.
+  The drafts spread 3.5 to 5.3, because they dropped Jed's longer sentences. The row flags 7 of 9 drafts and none
+  of Jed's pieces. It was set on that same test, so read it as a nudge.
+- The comma advice now shows the actual limit, not always "under 1".
+
 ## 2.7.0
 
 Three improvements from studying Emulate and Pangram.

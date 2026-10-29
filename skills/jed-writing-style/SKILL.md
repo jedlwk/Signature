@@ -48,7 +48,7 @@ the rest of this guide.
 | README, customer doc, report, one-pager, course paper | [references/documents.md](references/documents.md) | `doc`, `customer`, `course` |
 | Slides or a deck | [references/slides.md](references/slides.md) | `slides` |
 | Speaker script, voiceover, demo walkthrough | [references/scripts.md](references/scripts.md) | `script` |
-| LinkedIn, Medium, messages, emails, peer comments, names | [references/posts-and-messages.md](references/posts-and-messages.md) | `post`, `message` |
+| LinkedIn, Medium, messages, emails, peer comments, names | [references/posts-and-messages.md](references/posts-and-messages.md) | `post`, `message`, `peer` |
 | A whole project, including Word, PowerPoint, HTML and notebooks | [references/plan.md](references/plan.md) | per file |
 | Any `.docx` or `.pptx`, in any session, whatever it can or can't open | [references/office.md](references/office.md) | n/a |
 
@@ -75,7 +75,7 @@ Copy this checklist and tick it off.
 - [ ] 1. Find the material and the mode. Open its reference.
 - [ ] 2. List the facts Jed gave you. Anything not on the list needs a placeholder or a question.
 - [ ] 3. Draft short. Jed usually cuts a normal first draft by half, so start there.
-- [ ] 4. Run the checker with the right register and the facts. Add `--gate`, and `--voice` for a post, message or course text.
+- [ ] 4. Run the checker with the right register and the facts. Add `--gate`, and `--voice` for a post, message, peer reply or course text.
 - [ ] 5. Fix every flag that isn't a deliberate choice. Fix the sentence, not just the word.
 - [ ] 6. Reread the ending of each paragraph. The checker cannot judge a flourish.
 - [ ] 7. Run the checker once more with `--gate --log`. Stop after two passes.

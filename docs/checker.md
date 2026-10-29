@@ -54,6 +54,7 @@ uses `general`, or `code` for source files.
 | `doc` | READMEs, reports, one-pagers | Full rhythm checks. Any exclamation mark is flagged. |
 | `customer` | Customer docs and Q&A | Everything in `doc`, plus open loops ("we will come back to you") and narrated testing ("we've tested"). | <!-- signature:ignore-line -->
 | `course` | Course papers, discussion posts | Full rhythm checks. Any exclamation mark is flagged. |
+| `peer` | Replies to classmates, peer comments | Like `course`, but exclamation marks are allowed, as in "Hi [name]!!". |
 | `slides` | Decks (`.pptx` works) | Flags any line over 25 words. No sentence rhythm checks. |
 | `script` | Speaker and video scripts | Wants about 10 words a sentence and none over 25. Flags brackets, "e.g." and "&". Measures spoken length. |
 | `post` | LinkedIn and Medium | Exclamation marks allowed. |
@@ -101,8 +102,10 @@ python3 skills/jed-writing-style/scripts/ai_check.py --baseline ~/my-writing --s
 ```
 
 `--baseline` measures a folder of writing you wrote yourself and suggests thresholds for sentence
-length and commas. `--save` keeps them in `~/.claude/signature/calibration.json`, and later checks use
-them. They stay on your machine. Only measure your own writing, because text a model wrote would teach
+length and commas. With no folder, it measures the quoted pieces in `references/samples.md`. Read the
+suggestion before you save it. Three short pieces is a small base, and on Jed's samples it suggests
+limits tighter than the defaults that Jed's own LinkedIn post then fails. `--save` keeps them in
+`~/.claude/signature/calibration.json`, and later checks use them. They stay on your machine. Only measure your own writing, because text a model wrote would teach
 the checker the model's habits. `--no-calibration` ignores a saved file, and `--calibration FILE` uses
 a different one.
 
@@ -133,9 +136,10 @@ applies the 95% and 90% human-share rule. It sends the text off this computer, s
 script length. REVIEW means a score from 1 to 3 or a P0 tell. It exits 1 only on FIX.
 
 **Distance from Jed.** `--voice` compares a draft with the quoted writing in `references/samples.md`: words per
-sentence, short sentences, commas, and for posts, messages and course text, how often it says "I" and how many
-exclamation marks it uses. It re-measures whenever a sample is added. About 500 words is a small base, so read
-it as a nudge. Documents and slides legitimately differ from a post, so it skips them.
+sentence, short sentences, commas, and for posts, messages, peer replies and course text, how often it says "I"
+and how many exclamation marks it uses. From six sentences on, it also checks how much sentence lengths vary.
+Claude's imitations of Jed came out flatter than Jed, because they dropped the longer sentences. It re-measures
+whenever a sample is added. About 500 words is a small base, so read it as a nudge. Documents and slides legitimately differ from a post, so it skips them.
 
 **A private history.** `--log` adds a line to `~/.claude/signature/history.jsonl` with the date, register,
 scores and tell names. It never stores the text. `--history` shows whether scores are moving down and which

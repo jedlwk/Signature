@@ -10,7 +10,7 @@ Audit mode. Check this with the jed-writing-style skill: $ARGUMENTS
    `post` or `message`. Use the one the user named. If none was named, infer it from the file type
    and content.
 3. Run the checker. The script is at `${CLAUDE_PLUGIN_ROOT}/skills/jed-writing-style/scripts/ai_check.py`.
-   Pass a file path, or `-` with the text on stdin. Add `--gate`, and `--voice` for a post, message or course text.
+   Pass a file path, or `-` with the text on stdin. Add `--gate`, and `--voice` for a post, message, peer reply or course text.
 4. Report in this shape, and keep it short:
    - the summary line and the Gate line from the checker
    - P0 findings first, then P1, then P2, each with the line and the fix

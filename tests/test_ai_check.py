@@ -100,6 +100,16 @@ class IndividualRules(unittest.TestCase):
         self.assertIn("exclamation", labels(run(text, "doc")))
         self.assertNotIn("exclamation", labels(run(text, "post")))
         self.assertNotIn("exclamation", labels(run(text, "message")))
+        self.assertNotIn("exclamation", labels(run("Hi [name]!! great response! The Wilkinson talk goes further.", "peer")))
+        self.assertIn("exclamation", labels(run("Hi [name]!! great response! The Wilkinson talk goes further.", "course")))
+
+    def test_averages_wait_for_four_sentences(self):
+        three = ("Rather than just listen to me talk, I wanted the room to answer those questions themselves, with their "
+                 "laptop, without any coding. It went well. We left.")
+        self.assertFalse([r for r in run(three, "post")["rhythm"] if "commas per sentence" in r])
+        self.assertIn("comma-heavy sentence", labels(run(three, "post")))
+        four = three + " Then we ate, talked, laughed, and went home."
+        self.assertTrue([r for r in run(four, "post")["rhythm"] if "commas per sentence" in r])
 
     def test_ing_rider_and_copula(self):
         r = run("The tool serves as a hub, highlighting its importance.")
@@ -388,6 +398,15 @@ class Calibration(unittest.TestCase):
         self.assertEqual(p.returncode, 0)
         self.assertIn("mean_cap", p.stdout)
 
+    def test_cli_baseline_on_samples(self):
+        names = [n for n, _ in ai_check.sample_pieces(ai_check.SAMPLES_PATH)]
+        self.assertIn("LinkedIn post", names)
+        self.assertNotIn("How to use these", names)
+        p = subprocess.run([sys.executable, str(SCRIPT), "--baseline"], capture_output=True, text=True)
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertIn("LinkedIn post", p.stdout)
+        self.assertIn("mean_cap", p.stdout)
+
 
 class DocsPracticeWhatTheyPreach(unittest.TestCase):
     """The skill's own files must pass the checker, like the repo it learned from does."""
@@ -587,8 +606,9 @@ class WindowAndPangramTests(unittest.TestCase):
 
 
 class GateVoiceHistoryTests(unittest.TestCase):
-    POST = ("I spent last Tuesday morning with over 30 HR leaders. I wanted them to answer the questions themselves.\n\n"
-            "So we ran it on their laptops, with no code. It was loud and it was fun!! My role is closing the gap.\n\n"
+    POST = ("I spent last Tuesday morning with over 30 HR leaders. Rather than talk at them all morning, I wanted the "
+            "room to answer the questions themselves on their own laptops.\n\n"
+            "So we ran it with no code. Loud, and fun!! My role is closing the gap.\n\n"
             "It won't happen in one morning. But it adds up with every use case you try.")
 
     def test_gate_pass_review_and_fix(self):
@@ -607,6 +627,14 @@ class GateVoiceHistoryTests(unittest.TestCase):
         off = [r[0] for r in ai_check.voice_check(stiff, "post", profile) if not r[3]]
         self.assertIn("words per sentence", off)
         self.assertEqual(ai_check.voice_check(stiff, "doc", profile), [])
+
+    def test_voice_flags_flat_lengths(self):
+        profile = ai_check.voice_profile()
+        flat = " ".join(["We ran the session with the team today."] * 7)
+        off = [r[0] for r in ai_check.voice_check(flat, "peer", profile) if not r[3]]
+        self.assertIn("sentence length spread", off)
+        short = "We ran it. It went well. We left early. Then we went home."
+        self.assertNotIn("sentence length spread", [r[0] for r in ai_check.voice_check(short, "post", profile)])
 
     def test_log_and_history_keep_no_text(self):
         with tempfile.TemporaryDirectory() as d:
